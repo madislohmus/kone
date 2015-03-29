@@ -13,3 +13,7 @@ unique remote machine name 2, username, ip-address, port
 ...
 ```
 Key file is for example ~/.ssh/id_rsa, and password file is a file that contains only the password for sha key, if it has been password protected.
+
+
+## Screenshot
+![Screenshot](/../screenshot/output.gif?raw=true "Screenshot")
