@@ -13,12 +13,9 @@ import (
 )
 
 var (
-	wg       sync.WaitGroup
-	command  = `uptime | awk '{print $(NF-2) $(NF-1) $NF}' && free | grep Mem | awk '{print ($3-$6-$7)/$2}' && netstat -ant | wc -l && nproc && df -h / | grep '/' | awk '{print $5}'`
-	machines map[string]Machine
-)
-
-var (
+	wg         sync.WaitGroup
+	command    = `uptime | awk '{print $(NF-2) $(NF-1) $NF}' && free | grep Mem | awk '{print ($3-$6-$7)/$2}' && netstat -ant | wc -l && nproc && df -h / | grep '/' | awk '{print $5}' && cat /proc/uptime | awk '{print $1}'`
+	machines   map[string]Machine
 	signer     *ssh.Signer
 	sortedKeys []string
 	data       map[string]*Data
@@ -99,6 +96,13 @@ func populate(data *Data, result string) {
 		data.Storage = int32(stor)
 	}
 
+	ut, err := strconv.ParseFloat(s[5], 10)
+	if err != nil {
+		ut = -1
+	} else {
+		data.Uptime = int64(ut)
+	}
+
 }
 
 func getPassword() ([]byte, error) {
@@ -161,7 +165,7 @@ func main() {
 		for {
 			drawDate()
 			runAllHosts(command)
-			time.Sleep(10 * time.Second)
+			time.Sleep(time.Duration(*sleepTime) * time.Second)
 		}
 	}()
 	runCli()

@@ -16,6 +16,7 @@ var (
 	hFree    = "free"
 	hStorage = "df /"
 	hCons    = "conns"
+	hUptime  = "uptime"
 
 	headerRow    = 3
 	dateRow      = 1
@@ -28,7 +29,7 @@ func newStyledText() StyledText {
 
 func Init(m map[string]Machine) {
 	tic = TextInColumns{}
-	tic.Header = []string{hIndex, hMachine, hLoad1, hLoad5, hLoad15, hFree, hStorage, hCons}
+	tic.Header = []string{hIndex, hMachine, hLoad1, hLoad5, hLoad15, hFree, hStorage, hCons, hUptime}
 	tic.Data = make(map[string][]StyledText)
 	tic.ColumnWidth = make(map[string]int)
 	for _, h := range tic.Header {
@@ -44,6 +45,7 @@ func Init(m map[string]Machine) {
 		hFree:    AlignRight,
 		hStorage: AlignRight,
 		hCons:    AlignRight,
+		hUptime:  AlignLeft,
 	}
 	for k, _ := range m {
 		if len(k) > tic.ColumnWidth[hMachine] {
@@ -80,6 +82,7 @@ func formatAtIndex(i int) {
 	formatFree(i, d)
 	formatStorage(i, d)
 	formatCons(i, d)
+	formatUptime(i, d)
 }
 
 func formatIndex(i int, d *Data) {
@@ -210,6 +213,30 @@ func formatCons(i int, d *Data) {
 		}
 	}
 	tic.Data[hCons][i] = s
+}
+
+func formatUptime(i int, d *Data) {
+	s := newStyledText()
+	if d.GotResult {
+		for _, r := range time.Duration(time.Duration(d.Uptime) * time.Second).String() {
+			s.Runes = append(s.Runes, r)
+			if d.Uptime < 60 {
+				s.FG = append(s.FG, 8)
+			} else if d.Uptime < 3600 {
+				s.FG = append(s.FG, 4|termbox.AttrBold)
+			} else {
+				s.FG = append(s.FG, 9)
+			}
+			s.BG = append(s.BG, termbox.ColorDefault)
+		}
+	} else {
+		for _, r := range "-" {
+			s.Runes = append(s.Runes, r)
+			s.FG = append(s.FG, 9)
+			s.BG = append(s.BG, termbox.ColorDefault)
+		}
+	}
+	tic.Data[hUptime][i] = s
 }
 
 func drawHeader() {
