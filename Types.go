@@ -12,6 +12,7 @@ type (
 		Load1       float32
 		Load5       float32
 		Load15      float32
+		CPU         float32
 		Free        float32
 		Storage     int32
 		Connections int32

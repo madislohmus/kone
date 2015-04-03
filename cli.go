@@ -10,9 +10,8 @@ var (
 	tic      TextInColumns
 	hIndex   = " "
 	hMachine = "Machine"
-	hLoad1   = "load 1"
-	hLoad5   = "load 5"
-	hLoad15  = "load 15"
+	hLoad    = "load"
+	hCPU     = "CPU"
 	hFree    = "free"
 	hStorage = "df /"
 	hCons    = "conns"
@@ -30,7 +29,7 @@ func newStyledText() StyledText {
 
 func Init(m map[string]Machine) {
 	tic = TextInColumns{}
-	tic.Header = []string{hIndex, hMachine, hLoad1, hLoad5, hLoad15, hFree, hStorage, hCons, hUptime}
+	tic.Header = []string{hIndex, hMachine, hLoad, hCPU, hFree, hStorage, hCons, hUptime}
 	tic.Data = make(map[string][]StyledText)
 	tic.ColumnWidth = make(map[string]int)
 	for _, h := range tic.Header {
@@ -40,9 +39,8 @@ func Init(m map[string]Machine) {
 	tic.ColumnAlignment = map[string]Alignment{
 		hIndex:   AlignRight,
 		hMachine: AlignRight,
-		hLoad1:   AlignRight,
-		hLoad5:   AlignRight,
-		hLoad15:  AlignRight,
+		hLoad:    AlignRight,
+		hCPU:     AlignRight,
 		hFree:    AlignRight,
 		hStorage: AlignRight,
 		hCons:    AlignRight,
@@ -53,14 +51,20 @@ func Init(m map[string]Machine) {
 			tic.ColumnWidth[hMachine] = len(k)
 		}
 	}
-	tic.ColumnWidth[hFree] = 5
 }
 
 func drawAll() {
+	for i, _ := range sortedKeys {
+		formatAtIndex(i)
+	}
+	redraw()
+}
+
+func redraw() {
 	termbox.Clear(termbox.ColorDefault, termbox.ColorDefault)
 	adjustStartPosition()
-	drawHeader()
 	drawDate()
+	drawHeader()
 	for i, _ := range sortedKeys {
 		drawAtIndex(i, false)
 	}
@@ -70,6 +74,7 @@ func drawAll() {
 func drawMachine(machine string) {
 	for idx, _ := range sortedKeys {
 		if sortedKeys[idx] == machine {
+			formatAtIndex(idx)
 			drawAtIndex(idx, true)
 			break
 		}
@@ -81,6 +86,7 @@ func formatAtIndex(i int) {
 	formatIndex(i, d)
 	formatMachine(i, d)
 	formatLoads(i, d)
+	formatCPU(i, d)
 	formatFree(i, d)
 	formatStorage(i, d)
 	formatCons(i, d)
@@ -117,19 +123,53 @@ func formatMachine(i int, d *Data) {
 }
 
 func formatLoads(i int, d *Data) {
-	tic.Data[hLoad1][i] = formatLoad(i, d, d.Load1)
-	tic.Data[hLoad5][i] = formatLoad(i, d, d.Load5)
-	tic.Data[hLoad15][i] = formatLoad(i, d, d.Load15)
-}
-
-func formatLoad(i int, d *Data, load float32) StyledText {
 	s := newStyledText()
 	if d.GotResult {
-		for _, r := range fmt.Sprintf("%.2f", load) {
+		formatLoad(&s, d.Load1, d.Nproc)
+		s.Runes = append(s.Runes, ' ')
+		s.FG = append(s.FG, termbox.ColorDefault)
+		s.BG = append(s.BG, termbox.ColorDefault)
+		formatLoad(&s, d.Load5, d.Nproc)
+		s.Runes = append(s.Runes, ' ')
+		s.FG = append(s.FG, termbox.ColorDefault)
+		s.BG = append(s.BG, termbox.ColorDefault)
+		formatLoad(&s, d.Load15, d.Nproc)
+	} else {
+		for _, r := range "-" {
 			s.Runes = append(s.Runes, r)
-			if load < float32(d.Nproc)*0.8 {
+			s.FG = append(s.FG, 9)
+			s.BG = append(s.BG, termbox.ColorDefault)
+		}
+	}
+	tic.Data[hLoad][i] = s
+	if len(s.Runes) > tic.ColumnWidth[hLoad] {
+		tic.ColumnWidth[hLoad] = len(s.Runes)
+		redraw()
+	}
+}
+
+func formatLoad(s *StyledText, load float32, nproc int32) {
+	for _, r := range fmt.Sprintf("%.2f", load) {
+		s.Runes = append(s.Runes, r)
+		if load < float32(nproc)*0.8 {
+			s.FG = append(s.FG, 3)
+		} else if load < float32(nproc) {
+			s.FG = append(s.FG, 4|termbox.AttrBold)
+		} else {
+			s.FG = append(s.FG, 2|termbox.AttrBold)
+		}
+		s.BG = append(s.BG, termbox.ColorDefault)
+	}
+}
+
+func formatCPU(i int, d *Data) {
+	s := newStyledText()
+	if d.GotResult {
+		for _, r := range fmt.Sprintf("%.1f", d.CPU) {
+			s.Runes = append(s.Runes, r)
+			if d.CPU < float32(80*d.Nproc) {
 				s.FG = append(s.FG, 3)
-			} else if load < float32(d.Nproc) {
+			} else if d.CPU < float32(90*d.Nproc) {
 				s.FG = append(s.FG, 4|termbox.AttrBold)
 			} else {
 				s.FG = append(s.FG, 2|termbox.AttrBold)
@@ -143,7 +183,11 @@ func formatLoad(i int, d *Data, load float32) StyledText {
 			s.BG = append(s.BG, termbox.ColorDefault)
 		}
 	}
-	return s
+	tic.Data[hCPU][i] = s
+	if len(s.Runes) > tic.ColumnWidth[hCPU] {
+		tic.ColumnWidth[hCPU] = len(s.Runes)
+		redraw()
+	}
 }
 
 func formatFree(i int, d *Data) {
@@ -168,6 +212,10 @@ func formatFree(i int, d *Data) {
 		}
 	}
 	tic.Data[hFree][i] = s
+	if len(s.Runes) > tic.ColumnWidth[hFree] {
+		tic.ColumnWidth[hFree] = len(s.Runes)
+		redraw()
+	}
 }
 
 func formatStorage(i int, d *Data) {
@@ -192,6 +240,10 @@ func formatStorage(i int, d *Data) {
 		}
 	}
 	tic.Data[hStorage][i] = s
+	if len(s.Runes) > tic.ColumnWidth[hStorage] {
+		tic.ColumnWidth[hStorage] = len(s.Runes)
+		redraw()
+	}
 }
 
 func formatCons(i int, d *Data) {
@@ -216,6 +268,10 @@ func formatCons(i int, d *Data) {
 		}
 	}
 	tic.Data[hCons][i] = s
+	if len(s.Runes) > tic.ColumnWidth[hCons] {
+		tic.ColumnWidth[hCons] = len(s.Runes)
+		redraw()
+	}
 }
 
 func formatUptime(i int, d *Data) {
@@ -240,6 +296,10 @@ func formatUptime(i int, d *Data) {
 		}
 	}
 	tic.Data[hUptime][i] = s
+	if len(s.Runes) > tic.ColumnWidth[hUptime] {
+		tic.ColumnWidth[hUptime] = len(s.Runes)
+		redraw()
+	}
 }
 
 func drawHeader() {
@@ -270,22 +330,16 @@ func drawDate() {
 }
 
 func drawAtIndex(i int, flush bool) {
-
 	w, h := termbox.Size()
 	for j := 0; j < w; j++ {
 		termbox.SetCell(j, i+dataStartRow, ' ', termbox.ColorDefault, termbox.ColorDefault)
 	}
-
-	formatAtIndex(i)
-
 	currentTab := 1
 	for _, he := range tic.Header {
-
 		for c := startPosition; c < (startPosition+h-dataStartRow) && c < len(tic.Data[he]); c++ {
 			position := currentTab
 			row := c + dataStartRow - startPosition
 			s := tic.Data[he][c]
-
 			if tic.ColumnAlignment[he] == AlignCentre {
 				position += ((tic.ColumnWidth[he] - len(s.Runes)) / 2)
 			} else if tic.ColumnAlignment[he] == AlignRight {
@@ -297,7 +351,6 @@ func drawAtIndex(i int, flush bool) {
 		}
 		currentTab += tic.ColumnWidth[he] + 1
 	}
-
 	if flush {
 		termbox.Flush()
 	}

@@ -14,7 +14,7 @@ import (
 
 var (
 	wg         sync.WaitGroup
-	command    = `uptime | awk '{print $(NF-2) $(NF-1) $NF}' && free | grep Mem | awk '{print ($3-$6-$7)/$2}' && netstat -ant | wc -l && nproc && df -h / | grep '/' | awk '{print $5}' && cat /proc/uptime | awk '{print $1}'`
+	command    = `uptime | awk '{print $(NF-2) $(NF-1) $NF}' && free | grep Mem | awk '{print ($3-$6-$7)/$2}' && netstat -ant | wc -l && nproc && df -h / | grep '/' | awk '{print $5}' && cat /proc/uptime | awk '{print $1}' && top -b -n2 | grep "Cpu(s)"|tail -n 1 | awk '{print $2 + $4}'`
 	machines   map[string]Machine
 	signer     *ssh.Signer
 	sortedKeys []string
@@ -105,6 +105,13 @@ func populate(data *Data, result string) {
 		ut = -1
 	} else {
 		data.Uptime = int64(ut)
+	}
+
+	cpu, err := strconv.ParseFloat(s[6], 10)
+	if err != nil {
+		cpu = -1
+	} else {
+		data.CPU = float32(cpu)
 	}
 
 }
