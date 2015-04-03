@@ -30,7 +30,13 @@ func runAllHosts(command string) {
 		go func(key string) {
 			data[key].Fetching = true
 			drawMachine(key)
-			result, err := gosh.Run(command, machines[key].User, machines[key].IP, machines[key].Port, signer)
+			config := gosh.Config{
+				User:    machines[key].User,
+				Host:    machines[key].IP,
+				Port:    machines[key].Port,
+				Timeout: 15 * time.Second,
+				Signer:  signer}
+			result, err := gosh.Run(command, config)
 			if err != nil {
 				data[key].GotResult = false
 				data[key].Fetching = false
