@@ -25,7 +25,6 @@ var (
 
 func runAllHosts(command string) {
 	running = true
-	fetchTime = time.Now()
 	for k, _ := range machines {
 		wg.Add(1)
 		go func(key string) {
@@ -173,6 +172,7 @@ func main() {
 	go func() {
 		for {
 			if !running {
+				fetchTime = time.Now()
 				drawDate()
 				runAllHosts(command)
 			}
