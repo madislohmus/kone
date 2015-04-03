@@ -18,9 +18,10 @@ var (
 	hCons    = "conns"
 	hUptime  = "uptime"
 
-	headerRow    = 3
-	dateRow      = 1
-	dataStartRow = 4
+	headerRow     = 3
+	dateRow       = 1
+	dataStartRow  = 4
+	startPosition = 0
 )
 
 func newStyledText() StyledText {
@@ -57,6 +58,7 @@ func Init(m map[string]Machine) {
 
 func drawAll() {
 	termbox.Clear(termbox.ColorDefault, termbox.ColorDefault)
+	adjustStartPosition()
 	drawHeader()
 	drawDate()
 	for i, _ := range sortedKeys {
@@ -90,11 +92,12 @@ func formatIndex(i int, d *Data) {
 	for _, r := range fmt.Sprintf("%2d", i+1) {
 		s.Runes = append(s.Runes, r)
 		if d.Fetching {
-			s.FG = append(s.FG, 3)
+			s.FG = append(s.FG, 8)
+			s.BG = append(s.BG, 3)
 		} else {
 			s.FG = append(s.FG, 9)
+			s.BG = append(s.BG, termbox.ColorDefault)
 		}
-		s.BG = append(s.BG, termbox.ColorDefault)
 	}
 	tic.Data[hIndex][i] = s
 }
@@ -260,7 +263,7 @@ func drawDate() {
 	for _, h := range tic.Header {
 		w += tic.ColumnWidth[h] + 1
 	}
-	d := time.Now().Format(time.RFC1123)
+	d := fetchTime.Format(time.RFC1123)
 	for j, r := range d {
 		termbox.SetCell((w-len(d))/2+j, dateRow, r, 8, termbox.ColorDefault)
 	}
@@ -268,7 +271,7 @@ func drawDate() {
 
 func drawAtIndex(i int, flush bool) {
 
-	w, _ := termbox.Size()
+	w, h := termbox.Size()
 	for j := 0; j < w; j++ {
 		termbox.SetCell(j, i+dataStartRow, ' ', termbox.ColorDefault, termbox.ColorDefault)
 	}
@@ -276,24 +279,38 @@ func drawAtIndex(i int, flush bool) {
 	formatAtIndex(i)
 
 	currentTab := 1
-	for _, h := range tic.Header {
-		position := currentTab
+	for _, he := range tic.Header {
 
-		s := tic.Data[h][i]
+		for c := startPosition; c < (startPosition+h-dataStartRow) && c < len(tic.Data[he]); c++ {
+			position := currentTab
+			row := c + dataStartRow - startPosition
+			s := tic.Data[he][c]
 
-		if tic.ColumnAlignment[h] == AlignCentre {
-			position += ((tic.ColumnWidth[h] - len(s.Runes)) / 2)
-		} else if tic.ColumnAlignment[h] == AlignRight {
-			position += (tic.ColumnWidth[h] - len(s.Runes))
+			if tic.ColumnAlignment[he] == AlignCentre {
+				position += ((tic.ColumnWidth[he] - len(s.Runes)) / 2)
+			} else if tic.ColumnAlignment[he] == AlignRight {
+				position += (tic.ColumnWidth[he] - len(s.Runes))
+			}
+			for j := 0; j < len(s.Runes); j++ {
+				termbox.SetCell(position+j, row, s.Runes[j], s.FG[j], s.BG[j])
+			}
 		}
-		for j := 0; j < len(s.Runes); j++ {
-			termbox.SetCell(position+j, i+dataStartRow, s.Runes[j], s.FG[j], s.BG[j])
-		}
-		currentTab += tic.ColumnWidth[h] + 1
+		currentTab += tic.ColumnWidth[he] + 1
 	}
 
 	if flush {
 		termbox.Flush()
+	}
+}
+
+func adjustStartPosition() {
+	_, h := termbox.Size()
+	if h > (len(tic.Data[hMachine]) + dataStartRow) {
+		startPosition = 0
+	} else {
+		if startPosition+h-dataStartRow > len(tic.Data[hMachine]) {
+			startPosition = len(tic.Data[hMachine]) - (h - dataStartRow)
+		}
 	}
 }
 
@@ -312,6 +329,29 @@ loop:
 		switch ev := termbox.PollEvent(); ev.Type {
 		case termbox.EventKey:
 			switch ev.Key {
+			case termbox.KeyCtrlR:
+				if !running {
+					go func() {
+						drawDate()
+						runAllHosts(command)
+					}()
+				}
+			case termbox.KeyArrowUp:
+				_, h := termbox.Size()
+				if h < len(tic.Data[hMachine])+dataStartRow {
+					if startPosition > 0 {
+						startPosition--
+						drawAll()
+					}
+				}
+			case termbox.KeyArrowDown:
+				_, h := termbox.Size()
+				if h < len(tic.Data[hMachine])+dataStartRow-startPosition {
+					if startPosition < len(tic.Data[hMachine]) {
+						startPosition++
+						drawAll()
+					}
+				}
 			case termbox.KeyEsc:
 				break loop
 			}

@@ -19,9 +19,13 @@ var (
 	signer     *ssh.Signer
 	sortedKeys []string
 	data       map[string]*Data
+	running    bool
+	fetchTime  time.Time
 )
 
 func runAllHosts(command string) {
+	running = true
+	fetchTime = time.Now()
 	for k, _ := range machines {
 		wg.Add(1)
 		go func(key string) {
@@ -42,6 +46,7 @@ func runAllHosts(command string) {
 		}(k)
 	}
 	wg.Wait()
+	running = false
 }
 
 func populate(data *Data, result string) {
@@ -124,8 +129,12 @@ func populateMachines() error {
 	machines = make(map[string]Machine)
 	for _, line := range strings.Split(string(data), "\n") {
 		m := strings.Split(line, ",")
-		if len(m) == 4 {
-			machines[m[0]] = Machine{Name: m[0], User: m[1], IP: m[2], Port: m[3]}
+		if len(m) > 3 {
+			machines[strings.TrimSpace(m[0])] = Machine{
+				Name: strings.TrimSpace(m[0]),
+				User: strings.TrimSpace(m[1]),
+				IP:   strings.TrimSpace(m[2]),
+				Port: strings.TrimSpace(m[3])}
 		}
 	}
 	return nil
@@ -163,8 +172,10 @@ func main() {
 
 	go func() {
 		for {
-			drawDate()
-			runAllHosts(command)
+			if !running {
+				drawDate()
+				runAllHosts(command)
+			}
 			time.Sleep(time.Duration(*sleepTime) * time.Second)
 		}
 	}()
