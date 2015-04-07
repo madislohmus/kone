@@ -20,6 +20,7 @@ type (
 		Nproc       int32
 		Fetching    bool
 		GotResult   bool
+		Status      int
 	}
 
 	Sorter struct {
@@ -53,6 +54,10 @@ const (
 	AlignLeft Alignment = iota
 	AlignCentre
 	AlignRight
+
+	StatusOK      int = 1 << 1
+	StatusWarning     = 1 << 2
+	StatusError       = 1 << 3
 )
 
 var (

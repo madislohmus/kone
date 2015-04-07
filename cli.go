@@ -10,7 +10,9 @@ var (
 	tic      TextInColumns
 	hIndex   = " "
 	hMachine = "Machine"
-	hLoad    = "load"
+	hLoad1   = "l1"
+	hLoad5   = "l5"
+	hLoad15  = "l15"
 	hCPU     = "CPU"
 	hFree    = "free"
 	hStorage = "df /"
@@ -21,6 +23,8 @@ var (
 	dateRow       = 1
 	dataStartRow  = 4
 	startPosition = 0
+
+	silent bool
 )
 
 func newStyledText() StyledText {
@@ -29,7 +33,7 @@ func newStyledText() StyledText {
 
 func Init(m map[string]Machine) {
 	tic = TextInColumns{}
-	tic.Header = []string{hIndex, hMachine, hLoad, hCPU, hFree, hStorage, hCons, hUptime}
+	tic.Header = []string{hIndex, hMachine, hLoad1, hLoad5, hLoad15, hCPU, hFree, hStorage, hCons, hUptime}
 	tic.Data = make(map[string][]StyledText)
 	tic.ColumnWidth = make(map[string]int)
 	for _, h := range tic.Header {
@@ -39,7 +43,9 @@ func Init(m map[string]Machine) {
 	tic.ColumnAlignment = map[string]Alignment{
 		hIndex:   AlignRight,
 		hMachine: AlignRight,
-		hLoad:    AlignRight,
+		hLoad1:   AlignRight,
+		hLoad5:   AlignRight,
+		hLoad15:  AlignRight,
 		hCPU:     AlignRight,
 		hFree:    AlignRight,
 		hStorage: AlignRight,
@@ -83,14 +89,35 @@ func drawMachine(machine string) {
 
 func formatAtIndex(i int) {
 	d := data[sortedKeys[i]]
+	d.Status = StatusOK
 	formatIndex(i, d)
-	formatMachine(i, d)
 	formatLoads(i, d)
 	formatCPU(i, d)
 	formatFree(i, d)
 	formatStorage(i, d)
 	formatCons(i, d)
 	formatUptime(i, d)
+	formatMachine(i, d)
+}
+
+func appendSilent(s *StyledText) {
+	s.Runes = append(s.Runes, '\u00b7')
+	s.FG = append(s.FG, 9)
+	s.BG = append(s.BG, termbox.ColorDefault)
+}
+
+func appendNoData(s *StyledText) {
+	s.Runes = append(s.Runes, ' ')
+	s.FG = append(s.FG, termbox.ColorDefault)
+	s.BG = append(s.BG, termbox.ColorDefault)
+}
+
+func rowToHeader(s *StyledText, i int, header string) {
+	tic.Data[header][i] = *s
+	if len(s.Runes) > tic.ColumnWidth[header] {
+		tic.ColumnWidth[header] = len(s.Runes)
+		redraw()
+	}
 }
 
 func formatIndex(i int, d *Data) {
@@ -98,12 +125,11 @@ func formatIndex(i int, d *Data) {
 	for _, r := range fmt.Sprintf("%2d", i+1) {
 		s.Runes = append(s.Runes, r)
 		if d.Fetching {
-			s.FG = append(s.FG, 8)
-			s.BG = append(s.BG, 3)
+			s.FG = append(s.FG, 3|termbox.AttrBold)
 		} else {
 			s.FG = append(s.FG, 9)
-			s.BG = append(s.BG, termbox.ColorDefault)
 		}
+		s.BG = append(s.BG, termbox.ColorDefault)
 	}
 	tic.Data[hIndex][i] = s
 }
@@ -113,7 +139,17 @@ func formatMachine(i int, d *Data) {
 	for _, r := range d.Machine {
 		s.Runes = append(s.Runes, r)
 		if d.GotResult {
-			s.FG = append(s.FG, termbox.ColorDefault)
+			if d.Status&StatusError > 0 {
+				s.FG = append(s.FG, 2)
+			} else if d.Status&StatusWarning > 0 {
+				s.FG = append(s.FG, 4)
+			} else {
+				if silent {
+					s.FG = append(s.FG, 9)
+				} else {
+					s.FG = append(s.FG, termbox.ColorDefault)
+				}
+			}
 		} else {
 			s.FG = append(s.FG, 9)
 		}
@@ -123,183 +159,163 @@ func formatMachine(i int, d *Data) {
 }
 
 func formatLoads(i int, d *Data) {
-	s := newStyledText()
-	if d.GotResult {
-		formatLoad(&s, d.Load1, d.Nproc)
-		s.Runes = append(s.Runes, ' ')
-		s.FG = append(s.FG, termbox.ColorDefault)
-		s.BG = append(s.BG, termbox.ColorDefault)
-		formatLoad(&s, d.Load5, d.Nproc)
-		s.Runes = append(s.Runes, ' ')
-		s.FG = append(s.FG, termbox.ColorDefault)
-		s.BG = append(s.BG, termbox.ColorDefault)
-		formatLoad(&s, d.Load15, d.Nproc)
-	} else {
-		for _, r := range "-" {
-			s.Runes = append(s.Runes, r)
-			s.FG = append(s.FG, 9)
-			s.BG = append(s.BG, termbox.ColorDefault)
-		}
-	}
-	tic.Data[hLoad][i] = s
-	if len(s.Runes) > tic.ColumnWidth[hLoad] {
-		tic.ColumnWidth[hLoad] = len(s.Runes)
-		redraw()
-	}
+	rowToHeader(formatLoad(d.Load1, d), i, hLoad1)
+	rowToHeader(formatLoad(d.Load5, d), i, hLoad5)
+	rowToHeader(formatLoad(d.Load15, d), i, hLoad15)
 }
 
-func formatLoad(s *StyledText, load float32, nproc int32) {
-	for _, r := range fmt.Sprintf("%.2f", load) {
-		s.Runes = append(s.Runes, r)
-		if load < float32(nproc)*0.8 {
-			s.FG = append(s.FG, 3)
-		} else if load < float32(nproc) {
-			s.FG = append(s.FG, 4|termbox.AttrBold)
+func formatLoad(load float32, d *Data) *StyledText {
+	s := newStyledText()
+	if d.GotResult {
+		if silent && load < float32(d.Nproc)*0.8 {
+			appendSilent(&s)
 		} else {
-			s.FG = append(s.FG, 2|termbox.AttrBold)
+			for _, r := range fmt.Sprintf("%.2f", load) {
+				s.Runes = append(s.Runes, r)
+				if load < float32(d.Nproc)*0.8 {
+					s.FG = append(s.FG, 3)
+				} else if load < float32(d.Nproc) {
+					s.FG = append(s.FG, 4|termbox.AttrBold)
+					d.Status |= StatusWarning
+				} else {
+					s.FG = append(s.FG, 2|termbox.AttrBold)
+					d.Status |= StatusError
+				}
+				s.BG = append(s.BG, termbox.ColorDefault)
+			}
 		}
-		s.BG = append(s.BG, termbox.ColorDefault)
+	} else {
+		appendNoData(&s)
 	}
+	return &s
 }
 
 func formatCPU(i int, d *Data) {
 	s := newStyledText()
 	if d.GotResult {
-		for _, r := range fmt.Sprintf("%.1f", d.CPU) {
-			s.Runes = append(s.Runes, r)
-			if d.CPU < float32(80*d.Nproc) {
-				s.FG = append(s.FG, 3)
-			} else if d.CPU < float32(90*d.Nproc) {
-				s.FG = append(s.FG, 4|termbox.AttrBold)
-			} else {
-				s.FG = append(s.FG, 2|termbox.AttrBold)
+		if silent && d.CPU < float32(80*d.Nproc) {
+			appendSilent(&s)
+		} else {
+			for _, r := range fmt.Sprintf("%.1f", d.CPU) {
+				s.Runes = append(s.Runes, r)
+				if d.CPU < float32(80*d.Nproc) {
+					s.FG = append(s.FG, 3)
+				} else if d.CPU < float32(90*d.Nproc) {
+					s.FG = append(s.FG, 4|termbox.AttrBold)
+					d.Status |= StatusWarning
+				} else {
+					s.FG = append(s.FG, 2|termbox.AttrBold)
+					d.Status |= StatusError
+				}
+				s.BG = append(s.BG, termbox.ColorDefault)
 			}
-			s.BG = append(s.BG, termbox.ColorDefault)
 		}
 	} else {
-		for _, r := range "-" {
-			s.Runes = append(s.Runes, r)
-			s.FG = append(s.FG, 9)
-			s.BG = append(s.BG, termbox.ColorDefault)
-		}
+		appendNoData(&s)
 	}
-	tic.Data[hCPU][i] = s
-	if len(s.Runes) > tic.ColumnWidth[hCPU] {
-		tic.ColumnWidth[hCPU] = len(s.Runes)
-		redraw()
-	}
+	rowToHeader(&s, i, hCPU)
 }
 
 func formatFree(i int, d *Data) {
 	s := newStyledText()
 	if d.GotResult {
-		for _, r := range fmt.Sprintf("%.2f", d.Free) {
-			s.Runes = append(s.Runes, r)
-			if d.Free < 0.8 {
-				s.FG = append(s.FG, 3)
-			} else if d.Free < 0.9 {
-				s.FG = append(s.FG, 4|termbox.AttrBold)
-			} else {
-				s.FG = append(s.FG, 2|termbox.AttrBold)
+		if silent && d.Free < 0.8 {
+			appendSilent(&s)
+		} else {
+			for _, r := range fmt.Sprintf("%.2f", d.Free) {
+				s.Runes = append(s.Runes, r)
+				if d.Free < 0.8 {
+					s.FG = append(s.FG, 3)
+				} else if d.Free < 0.9 {
+					s.FG = append(s.FG, 4|termbox.AttrBold)
+					d.Status |= StatusWarning
+				} else {
+					s.FG = append(s.FG, 2|termbox.AttrBold)
+					d.Status |= StatusError
+				}
+				s.BG = append(s.BG, termbox.ColorDefault)
 			}
-			s.BG = append(s.BG, termbox.ColorDefault)
 		}
 	} else {
-		for _, r := range "-" {
-			s.Runes = append(s.Runes, r)
-			s.FG = append(s.FG, 9)
-			s.BG = append(s.BG, termbox.ColorDefault)
-		}
+		appendNoData(&s)
 	}
-	tic.Data[hFree][i] = s
-	if len(s.Runes) > tic.ColumnWidth[hFree] {
-		tic.ColumnWidth[hFree] = len(s.Runes)
-		redraw()
-	}
+	rowToHeader(&s, i, hFree)
 }
 
 func formatStorage(i int, d *Data) {
 	s := newStyledText()
 	if d.GotResult {
-		for _, r := range fmt.Sprintf("%3d", d.Storage) {
-			s.Runes = append(s.Runes, r)
-			if d.Storage < 80 {
-				s.FG = append(s.FG, 3)
-			} else if d.Free < 90 {
-				s.FG = append(s.FG, 4|termbox.AttrBold)
-			} else {
-				s.FG = append(s.FG, 2|termbox.AttrBold)
+		if silent && d.Storage < 80 {
+			appendSilent(&s)
+		} else {
+			for _, r := range fmt.Sprintf("%3d", d.Storage) {
+				s.Runes = append(s.Runes, r)
+				if d.Storage < 80 {
+					s.FG = append(s.FG, 3)
+				} else if d.Free < 90 {
+					s.FG = append(s.FG, 4|termbox.AttrBold)
+					d.Status |= StatusWarning
+				} else {
+					s.FG = append(s.FG, 2|termbox.AttrBold)
+					d.Status |= StatusError
+				}
+				s.BG = append(s.BG, termbox.ColorDefault)
 			}
-			s.BG = append(s.BG, termbox.ColorDefault)
 		}
 	} else {
-		for _, r := range "-" {
-			s.Runes = append(s.Runes, r)
-			s.FG = append(s.FG, 9)
-			s.BG = append(s.BG, termbox.ColorDefault)
-		}
+		appendNoData(&s)
 	}
-	tic.Data[hStorage][i] = s
-	if len(s.Runes) > tic.ColumnWidth[hStorage] {
-		tic.ColumnWidth[hStorage] = len(s.Runes)
-		redraw()
-	}
+	rowToHeader(&s, i, hStorage)
 }
 
 func formatCons(i int, d *Data) {
 	s := newStyledText()
 	if d.GotResult {
-		for _, r := range fmt.Sprintf("%d", d.Connections) {
-			s.Runes = append(s.Runes, r)
-			if d.Connections < 1000 {
-				s.FG = append(s.FG, 3)
-			} else if d.Connections < 10000 {
-				s.FG = append(s.FG, 4|termbox.AttrBold)
-			} else {
-				s.FG = append(s.FG, 2|termbox.AttrBold)
+		if silent && d.Connections < 1000 {
+			appendSilent(&s)
+		} else {
+			for _, r := range fmt.Sprintf("%d", d.Connections) {
+				s.Runes = append(s.Runes, r)
+				if d.Connections < 1000 {
+					s.FG = append(s.FG, 3)
+				} else if d.Connections < 10000 {
+					s.FG = append(s.FG, 4|termbox.AttrBold)
+					d.Status |= StatusWarning
+				} else {
+					s.FG = append(s.FG, 2|termbox.AttrBold)
+					d.Status |= StatusError
+				}
+				s.BG = append(s.BG, termbox.ColorDefault)
 			}
-			s.BG = append(s.BG, termbox.ColorDefault)
 		}
 	} else {
-		for _, r := range "-" {
-			s.Runes = append(s.Runes, r)
-			s.FG = append(s.FG, 9)
-			s.BG = append(s.BG, termbox.ColorDefault)
-		}
+		appendNoData(&s)
 	}
-	tic.Data[hCons][i] = s
-	if len(s.Runes) > tic.ColumnWidth[hCons] {
-		tic.ColumnWidth[hCons] = len(s.Runes)
-		redraw()
-	}
+	rowToHeader(&s, i, hCons)
 }
 
 func formatUptime(i int, d *Data) {
 	s := newStyledText()
 	if d.GotResult {
-		for _, r := range time.Duration(time.Duration(d.Uptime) * time.Second).String() {
-			s.Runes = append(s.Runes, r)
-			if d.Uptime < 60 {
-				s.FG = append(s.FG, 8)
-			} else if d.Uptime < 3600 {
-				s.FG = append(s.FG, 4|termbox.AttrBold)
-			} else {
-				s.FG = append(s.FG, 9)
+		if silent {
+			appendSilent(&s)
+		} else {
+			for _, r := range time.Duration(time.Duration(d.Uptime) * time.Second).String() {
+				s.Runes = append(s.Runes, r)
+				if d.Uptime < 60 {
+					s.FG = append(s.FG, 8)
+				} else if d.Uptime < 3600 {
+					s.FG = append(s.FG, 4|termbox.AttrBold)
+				} else {
+					s.FG = append(s.FG, 9)
+				}
+				s.BG = append(s.BG, termbox.ColorDefault)
 			}
-			s.BG = append(s.BG, termbox.ColorDefault)
 		}
 	} else {
-		for _, r := range "-" {
-			s.Runes = append(s.Runes, r)
-			s.FG = append(s.FG, 9)
-			s.BG = append(s.BG, termbox.ColorDefault)
-		}
+		appendNoData(&s)
 	}
-	tic.Data[hUptime][i] = s
-	if len(s.Runes) > tic.ColumnWidth[hUptime] {
-		tic.ColumnWidth[hUptime] = len(s.Runes)
-		redraw()
-	}
+	rowToHeader(&s, i, hUptime)
 }
 
 func drawHeader() {
@@ -405,6 +421,9 @@ loop:
 						drawAll()
 					}
 				}
+			case termbox.KeyCtrlS:
+				silent = !silent
+				drawAll()
 			case termbox.KeyEsc:
 				break loop
 			}
