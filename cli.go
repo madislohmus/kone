@@ -102,7 +102,7 @@ func formatAtIndex(i int) {
 
 func appendSilent(s *StyledText) {
 	s.Runes = append(s.Runes, '\u00b7')
-	s.FG = append(s.FG, 9)
+	s.FG = append(s.FG, 3)
 	s.BG = append(s.BG, termbox.ColorDefault)
 }
 

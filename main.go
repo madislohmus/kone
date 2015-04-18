@@ -66,14 +66,14 @@ func populate(data *Data, result string) {
 
 	l5, err := strconv.ParseFloat(loads[1], 32)
 	if err != nil {
-		data.Load1 = -1
+		data.Load5 = -1
 	} else {
 		data.Load5 = float32(l5)
 	}
 
 	l15, err := strconv.ParseFloat(loads[2], 32)
 	if err != nil {
-		data.Load1 = -1
+		data.Load15 = -1
 	} else {
 		data.Load15 = float32(l15)
 	}
