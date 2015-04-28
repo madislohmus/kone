@@ -8,19 +8,21 @@ import (
 
 type (
 	Data struct {
-		Machine     string
-		Load1       float32
-		Load5       float32
-		Load15      float32
-		CPU         float32
-		Free        float32
-		Storage     int32
-		Connections int32
-		Uptime      int64
-		Nproc       int32
-		Fetching    bool
-		GotResult   bool
-		Status      int
+		Machine       string
+		IP            string
+		Load1         float32
+		Load5         float32
+		Load15        float32
+		CPU           float32
+		Free          float32
+		Storage       int32
+		Connections   int32
+		Uptime        int64
+		Nproc         int32
+		Fetching      bool
+		GotResult     bool
+		Status        int
+		FetchingError string
 	}
 
 	Sorter struct {

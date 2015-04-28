@@ -24,7 +24,8 @@ var (
 	dataStartRow  = 4
 	startPosition = 0
 
-	silent bool
+	silent  bool
+	showIPs bool
 )
 
 func newStyledText() StyledText {
@@ -102,7 +103,7 @@ func formatAtIndex(i int) {
 
 func appendSilent(s *StyledText) {
 	s.Runes = append(s.Runes, '\u00b7')
-	s.FG = append(s.FG, 3)
+	s.FG = append(s.FG, 9)
 	s.BG = append(s.BG, termbox.ColorDefault)
 }
 
@@ -136,7 +137,11 @@ func formatIndex(i int, d *Data) {
 
 func formatMachine(i int, d *Data) {
 	s := newStyledText()
-	for _, r := range d.Machine {
+	name := d.Machine
+	if showIPs {
+		name = d.IP
+	}
+	for _, r := range name {
 		s.Runes = append(s.Runes, r)
 		if d.GotResult {
 			if d.Status&StatusError > 0 {
@@ -421,11 +426,16 @@ loop:
 						drawAll()
 					}
 				}
-			case termbox.KeyCtrlS:
-				silent = !silent
-				drawAll()
 			case termbox.KeyEsc:
 				break loop
+			}
+			switch ev.Ch {
+			case 115:
+				silent = !silent
+				drawAll()
+			case 105:
+				showIPs = !showIPs
+				drawAll()
 			}
 		case termbox.EventResize:
 			drawAll()

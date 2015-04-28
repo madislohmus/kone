@@ -40,6 +40,7 @@ func runAllHosts(command string) {
 			if err != nil {
 				data[key].GotResult = false
 				data[key].Fetching = false
+				data[key].FetchingError = err.Error()
 				drawMachine(key)
 			} else {
 				data[key].GotResult = true
@@ -174,9 +175,9 @@ func main() {
 	Init(machines)
 	signer = s
 	data = make(map[string]*Data)
-	for k, _ := range machines {
+	for k, v := range machines {
 		sortedKeys = append(sortedKeys, k)
-		data[k] = &Data{Machine: k}
+		data[k] = &Data{Machine: k, IP: v.IP}
 	}
 
 	srt := Sorter{data: sortedKeys}
