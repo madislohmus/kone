@@ -450,16 +450,7 @@ func openConsole() {
 	}()
 }
 
-func runCli() {
-	err := termbox.Init()
-	if err != nil {
-		panic(err)
-	}
-	defer termbox.Close()
-	termbox.SetOutputMode(termbox.Output256)
-
-	drawAll()
-
+func keyLoop() {
 loop:
 	for {
 		switch ev := termbox.PollEvent(); ev.Type {
@@ -507,16 +498,16 @@ loop:
 			case termbox.KeyPgdn:
 				_, h := termbox.Size()
 				pageSize := h - dataStartRow
-				if cursorPosition+pageSize > len(tic.Data[hMachine])-1 {
-					cursorPosition = len(tic.Data[hMachine]) - 1
-					startPosition = len(tic.Data[hMachine]) - (h - dataStartRow)
-				} else {
+				dataLength := len(tic.Data[tic.Header[0]])
+				if cursorPosition+pageSize < dataLength {
 					cursorPosition += pageSize
-					if len(tic.Data[hMachine])-(cursorPosition+pageSize) < pageSize {
-						startPosition = len(tic.Data[hMachine]) - pageSize
-					} else {
-						startPosition = cursorPosition
-					}
+				} else {
+					cursorPosition = dataLength - 1
+				}
+				if startPosition+pageSize < dataLength-pageSize {
+					startPosition += pageSize
+				} else {
+					startPosition = dataLength - pageSize
 				}
 				drawAll()
 			case termbox.KeyPgup:
@@ -549,4 +540,19 @@ loop:
 			drawAll()
 		}
 	}
+}
+
+func initTermbox() {
+	err := termbox.Init()
+	if err != nil {
+		panic(err)
+	}
+	defer termbox.Close()
+	termbox.SetOutputMode(termbox.Output256)
+}
+
+func runCli() {
+	initTermbox()
+	drawAll()
+	keyLoop()
 }
