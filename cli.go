@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"github.com/nsf/termbox-go"
+	"os/exec"
 	"time"
 )
 
@@ -19,13 +20,17 @@ var (
 	hCons    = "conns"
 	hUptime  = "uptime"
 
-	headerRow     = 3
-	dateRow       = 1
-	dataStartRow  = 4
-	startPosition = 0
+	headerRow      = 3
+	dateRow        = 1
+	dataStartRow   = 4
+	startPosition  = 0
+	cursorPosition = 0
 
 	silent  bool
 	showIPs bool
+
+	selectedBg = termbox.ColorBlack | termbox.AttrBold
+	selectedFg = termbox.ColorWhite | termbox.AttrBold
 )
 
 func newStyledText() StyledText {
@@ -101,16 +106,16 @@ func formatAtIndex(i int) {
 	formatMachine(i, d)
 }
 
-func appendSilent(s *StyledText) {
+func appendSilent(s *StyledText, i int) {
 	s.Runes = append(s.Runes, '\u00b7')
 	s.FG = append(s.FG, 9)
-	s.BG = append(s.BG, termbox.ColorDefault)
+	addBgColor(s, i)
 }
 
-func appendNoData(s *StyledText) {
+func appendNoData(s *StyledText, i int) {
 	s.Runes = append(s.Runes, ' ')
 	s.FG = append(s.FG, termbox.ColorDefault)
-	s.BG = append(s.BG, termbox.ColorDefault)
+	addBgColor(s, i)
 }
 
 func rowToHeader(s *StyledText, i int, header string) {
@@ -125,14 +130,26 @@ func formatIndex(i int, d *Data) {
 	s := newStyledText()
 	for _, r := range fmt.Sprintf("%2d", i+1) {
 		s.Runes = append(s.Runes, r)
-		if d.Fetching {
-			s.FG = append(s.FG, 3|termbox.AttrBold)
+		if cursorPosition == i {
+			s.FG = append(s.FG, selectedFg)
 		} else {
-			s.FG = append(s.FG, 9)
+			if d.Fetching {
+				s.FG = append(s.FG, 3|termbox.AttrBold)
+			} else {
+				s.FG = append(s.FG, 9)
+			}
 		}
-		s.BG = append(s.BG, termbox.ColorDefault)
+		addBgColor(&s, i)
 	}
 	tic.Data[hIndex][i] = s
+}
+
+func addBgColor(s *StyledText, i int) {
+	if cursorPosition == i {
+		s.BG = append(s.BG, selectedBg)
+	} else {
+		s.BG = append(s.BG, termbox.ColorDefault)
+	}
 }
 
 func formatMachine(i int, d *Data) {
@@ -143,54 +160,62 @@ func formatMachine(i int, d *Data) {
 	}
 	for _, r := range name {
 		s.Runes = append(s.Runes, r)
-		if d.GotResult {
-			if d.Status&StatusError > 0 {
-				s.FG = append(s.FG, 2)
-			} else if d.Status&StatusWarning > 0 {
-				s.FG = append(s.FG, 4)
-			} else {
-				if silent {
-					s.FG = append(s.FG, 9)
-				} else {
-					s.FG = append(s.FG, termbox.ColorDefault)
-				}
-			}
+		if cursorPosition == i {
+			s.FG = append(s.FG, selectedFg)
 		} else {
-			s.FG = append(s.FG, 9)
+			if d.GotResult {
+				if d.Status&StatusError > 0 {
+					s.FG = append(s.FG, 2)
+				} else if d.Status&StatusWarning > 0 {
+					s.FG = append(s.FG, 4)
+				} else {
+					if silent {
+						s.FG = append(s.FG, 9)
+					} else {
+						s.FG = append(s.FG, termbox.ColorDefault)
+					}
+				}
+			} else {
+				s.FG = append(s.FG, 9)
+			}
 		}
-		s.BG = append(s.BG, termbox.ColorDefault)
+		addBgColor(&s, i)
 	}
 	tic.Data[hMachine][i] = s
 }
 
 func formatLoads(i int, d *Data) {
-	rowToHeader(formatLoad(d.Load1, d), i, hLoad1)
-	rowToHeader(formatLoad(d.Load5, d), i, hLoad5)
-	rowToHeader(formatLoad(d.Load15, d), i, hLoad15)
+	rowToHeader(formatLoad(d.Load1, d, i), i, hLoad1)
+	rowToHeader(formatLoad(d.Load5, d, i), i, hLoad5)
+	rowToHeader(formatLoad(d.Load15, d, i), i, hLoad15)
 }
 
-func formatLoad(load float32, d *Data) *StyledText {
+func formatLoad(load float32, d *Data, i int) *StyledText {
 	s := newStyledText()
 	if d.GotResult {
 		if silent && load < float32(d.Nproc)*0.8 {
-			appendSilent(&s)
+			appendSilent(&s, i)
 		} else {
 			for _, r := range fmt.Sprintf("%.2f", load) {
 				s.Runes = append(s.Runes, r)
-				if load < float32(d.Nproc)*0.8 {
-					s.FG = append(s.FG, 3)
-				} else if load < float32(d.Nproc) {
-					s.FG = append(s.FG, 4|termbox.AttrBold)
-					d.Status |= StatusWarning
+				if cursorPosition == i {
+					s.FG = append(s.FG, selectedFg)
 				} else {
-					s.FG = append(s.FG, 2|termbox.AttrBold)
-					d.Status |= StatusError
+					if load < float32(d.Nproc)*0.8 {
+						s.FG = append(s.FG, 3)
+					} else if load < float32(d.Nproc) {
+						s.FG = append(s.FG, 4|termbox.AttrBold)
+						d.Status |= StatusWarning
+					} else {
+						s.FG = append(s.FG, 2|termbox.AttrBold)
+						d.Status |= StatusError
+					}
 				}
-				s.BG = append(s.BG, termbox.ColorDefault)
+				addBgColor(&s, i)
 			}
 		}
 	} else {
-		appendNoData(&s)
+		appendNoData(&s, i)
 	}
 	return &s
 }
@@ -199,24 +224,28 @@ func formatCPU(i int, d *Data) {
 	s := newStyledText()
 	if d.GotResult {
 		if silent && d.CPU < float32(80*d.Nproc) {
-			appendSilent(&s)
+			appendSilent(&s, i)
 		} else {
 			for _, r := range fmt.Sprintf("%.1f", d.CPU) {
 				s.Runes = append(s.Runes, r)
-				if d.CPU < float32(80*d.Nproc) {
-					s.FG = append(s.FG, 3)
-				} else if d.CPU < float32(90*d.Nproc) {
-					s.FG = append(s.FG, 4|termbox.AttrBold)
-					d.Status |= StatusWarning
+				if cursorPosition == i {
+					s.FG = append(s.FG, selectedFg)
 				} else {
-					s.FG = append(s.FG, 2|termbox.AttrBold)
-					d.Status |= StatusError
+					if d.CPU < float32(80*d.Nproc) {
+						s.FG = append(s.FG, 3)
+					} else if d.CPU < float32(90*d.Nproc) {
+						s.FG = append(s.FG, 4|termbox.AttrBold)
+						d.Status |= StatusWarning
+					} else {
+						s.FG = append(s.FG, 2|termbox.AttrBold)
+						d.Status |= StatusError
+					}
 				}
-				s.BG = append(s.BG, termbox.ColorDefault)
+				addBgColor(&s, i)
 			}
 		}
 	} else {
-		appendNoData(&s)
+		appendNoData(&s, i)
 	}
 	rowToHeader(&s, i, hCPU)
 }
@@ -225,24 +254,28 @@ func formatFree(i int, d *Data) {
 	s := newStyledText()
 	if d.GotResult {
 		if silent && d.Free < 0.8 {
-			appendSilent(&s)
+			appendSilent(&s, i)
 		} else {
 			for _, r := range fmt.Sprintf("%.2f", d.Free) {
 				s.Runes = append(s.Runes, r)
-				if d.Free < 0.8 {
-					s.FG = append(s.FG, 3)
-				} else if d.Free < 0.9 {
-					s.FG = append(s.FG, 4|termbox.AttrBold)
-					d.Status |= StatusWarning
+				if cursorPosition == i {
+					s.FG = append(s.FG, selectedFg)
 				} else {
-					s.FG = append(s.FG, 2|termbox.AttrBold)
-					d.Status |= StatusError
+					if d.Free < 0.8 {
+						s.FG = append(s.FG, 3)
+					} else if d.Free < 0.9 {
+						s.FG = append(s.FG, 4|termbox.AttrBold)
+						d.Status |= StatusWarning
+					} else {
+						s.FG = append(s.FG, 2|termbox.AttrBold)
+						d.Status |= StatusError
+					}
 				}
-				s.BG = append(s.BG, termbox.ColorDefault)
+				addBgColor(&s, i)
 			}
 		}
 	} else {
-		appendNoData(&s)
+		appendNoData(&s, i)
 	}
 	rowToHeader(&s, i, hFree)
 }
@@ -251,24 +284,28 @@ func formatStorage(i int, d *Data) {
 	s := newStyledText()
 	if d.GotResult {
 		if silent && d.Storage < 80 {
-			appendSilent(&s)
+			appendSilent(&s, i)
 		} else {
 			for _, r := range fmt.Sprintf("%3d", d.Storage) {
 				s.Runes = append(s.Runes, r)
-				if d.Storage < 80 {
-					s.FG = append(s.FG, 3)
-				} else if d.Free < 90 {
-					s.FG = append(s.FG, 4|termbox.AttrBold)
-					d.Status |= StatusWarning
+				if cursorPosition == i {
+					s.FG = append(s.FG, selectedFg)
 				} else {
-					s.FG = append(s.FG, 2|termbox.AttrBold)
-					d.Status |= StatusError
+					if d.Storage < 80 {
+						s.FG = append(s.FG, 3)
+					} else if d.Free < 90 {
+						s.FG = append(s.FG, 4|termbox.AttrBold)
+						d.Status |= StatusWarning
+					} else {
+						s.FG = append(s.FG, 2|termbox.AttrBold)
+						d.Status |= StatusError
+					}
 				}
-				s.BG = append(s.BG, termbox.ColorDefault)
+				addBgColor(&s, i)
 			}
 		}
 	} else {
-		appendNoData(&s)
+		appendNoData(&s, i)
 	}
 	rowToHeader(&s, i, hStorage)
 }
@@ -277,24 +314,28 @@ func formatCons(i int, d *Data) {
 	s := newStyledText()
 	if d.GotResult {
 		if silent && d.Connections < 1000 {
-			appendSilent(&s)
+			appendSilent(&s, i)
 		} else {
 			for _, r := range fmt.Sprintf("%d", d.Connections) {
 				s.Runes = append(s.Runes, r)
-				if d.Connections < 1000 {
-					s.FG = append(s.FG, 3)
-				} else if d.Connections < 10000 {
-					s.FG = append(s.FG, 4|termbox.AttrBold)
-					d.Status |= StatusWarning
+				if cursorPosition == i {
+					s.FG = append(s.FG, selectedFg)
 				} else {
-					s.FG = append(s.FG, 2|termbox.AttrBold)
-					d.Status |= StatusError
+					if d.Connections < 1000 {
+						s.FG = append(s.FG, 3)
+					} else if d.Connections < 10000 {
+						s.FG = append(s.FG, 4|termbox.AttrBold)
+						d.Status |= StatusWarning
+					} else {
+						s.FG = append(s.FG, 2|termbox.AttrBold)
+						d.Status |= StatusError
+					}
 				}
-				s.BG = append(s.BG, termbox.ColorDefault)
+				addBgColor(&s, i)
 			}
 		}
 	} else {
-		appendNoData(&s)
+		appendNoData(&s, i)
 	}
 	rowToHeader(&s, i, hCons)
 }
@@ -303,22 +344,26 @@ func formatUptime(i int, d *Data) {
 	s := newStyledText()
 	if d.GotResult {
 		if silent {
-			appendSilent(&s)
+			appendSilent(&s, i)
 		} else {
 			for _, r := range time.Duration(time.Duration(d.Uptime) * time.Second).String() {
 				s.Runes = append(s.Runes, r)
-				if d.Uptime < 60 {
-					s.FG = append(s.FG, 8)
-				} else if d.Uptime < 3600 {
-					s.FG = append(s.FG, 4|termbox.AttrBold)
+				if cursorPosition == i {
+					s.FG = append(s.FG, selectedFg)
 				} else {
-					s.FG = append(s.FG, 9)
+					if d.Uptime < 60 {
+						s.FG = append(s.FG, 8)
+					} else if d.Uptime < 3600 {
+						s.FG = append(s.FG, 4|termbox.AttrBold)
+					} else {
+						s.FG = append(s.FG, 9)
+					}
 				}
-				s.BG = append(s.BG, termbox.ColorDefault)
+				addBgColor(&s, i)
 			}
 		}
 	} else {
-		appendNoData(&s)
+		appendNoData(&s, i)
 	}
 	rowToHeader(&s, i, hUptime)
 }
@@ -352,23 +397,28 @@ func drawDate() {
 
 func drawAtIndex(i int, flush bool) {
 	w, h := termbox.Size()
+	if i < startPosition || i > startPosition+h-dataStartRow {
+		return
+	}
+	row := i - startPosition + dataStartRow
+	bg := termbox.ColorDefault
 	for j := 0; j < w; j++ {
-		termbox.SetCell(j, i+dataStartRow, ' ', termbox.ColorDefault, termbox.ColorDefault)
+		if cursorPosition == i {
+			bg = selectedBg
+		}
+		termbox.SetCell(j, row, ' ', termbox.ColorDefault, bg)
 	}
 	currentTab := 1
 	for _, he := range tic.Header {
-		for c := startPosition; c < (startPosition+h-dataStartRow) && c < len(tic.Data[he]); c++ {
-			position := currentTab
-			row := c + dataStartRow - startPosition
-			s := tic.Data[he][c]
-			if tic.ColumnAlignment[he] == AlignCentre {
-				position += ((tic.ColumnWidth[he] - len(s.Runes)) / 2)
-			} else if tic.ColumnAlignment[he] == AlignRight {
-				position += (tic.ColumnWidth[he] - len(s.Runes))
-			}
-			for j := 0; j < len(s.Runes); j++ {
-				termbox.SetCell(position+j, row, s.Runes[j], s.FG[j], s.BG[j])
-			}
+		position := currentTab
+		s := tic.Data[he][i]
+		if tic.ColumnAlignment[he] == AlignCentre {
+			position += ((tic.ColumnWidth[he] - len(s.Runes)) / 2)
+		} else if tic.ColumnAlignment[he] == AlignRight {
+			position += (tic.ColumnWidth[he] - len(s.Runes))
+		}
+		for j := 0; j < len(s.Runes); j++ {
+			termbox.SetCell(position+j, row, s.Runes[j], s.FG[j], s.BG[j])
 		}
 		currentTab += tic.ColumnWidth[he] + 1
 	}
@@ -386,6 +436,18 @@ func adjustStartPosition() {
 			startPosition = len(tic.Data[hMachine]) - (h - dataStartRow)
 		}
 	}
+}
+
+func openConsole() {
+	name := machines[sortedKeys[cursorPosition]].Name
+	user := machines[sortedKeys[cursorPosition]].User
+	cmd := exec.Command("urxvt", "-e", "ssh", fmt.Sprintf("%s@%s", user, name))
+	go func() {
+		err := cmd.Run()
+		if err != nil {
+			fmt.Println(err.Error())
+		}
+	}()
 }
 
 func runCli() {
@@ -411,21 +473,67 @@ loop:
 					}()
 				}
 			case termbox.KeyArrowUp:
-				_, h := termbox.Size()
-				if h < len(tic.Data[hMachine])+dataStartRow {
-					if startPosition > 0 {
-						startPosition--
-						drawAll()
+				if cursorPosition > 0 {
+					if cursorPosition == startPosition {
+						if startPosition > 0 {
+							startPosition--
+						}
 					}
+					cursorPosition--
+					drawAll()
 				}
 			case termbox.KeyArrowDown:
 				_, h := termbox.Size()
-				if h < len(tic.Data[hMachine])+dataStartRow-startPosition {
-					if startPosition < len(tic.Data[hMachine]) {
-						startPosition++
-						drawAll()
+				if cursorPosition < len(tic.Data[hMachine])-1 {
+					cursorPosition++
+					if cursorPosition == startPosition+(h-dataStartRow) {
+						if startPosition < len(tic.Data[hMachine]) {
+							startPosition++
+						}
+					}
+					drawAll()
+				}
+			case termbox.KeyEnter:
+				openConsole()
+			case termbox.KeyEnd:
+				_, h := termbox.Size()
+				cursorPosition = len(tic.Data[hMachine]) - 1
+				startPosition = len(tic.Data[hMachine]) - (h - dataStartRow)
+				drawAll()
+			case termbox.KeyHome:
+				cursorPosition = 0
+				startPosition = 0
+				drawAll()
+			case termbox.KeyPgdn:
+				_, h := termbox.Size()
+				pageSize := h - dataStartRow
+				if cursorPosition+pageSize > len(tic.Data[hMachine])-1 {
+					cursorPosition = len(tic.Data[hMachine]) - 1
+					startPosition = len(tic.Data[hMachine]) - (h - dataStartRow)
+				} else {
+					cursorPosition += pageSize
+					if len(tic.Data[hMachine])-(cursorPosition+pageSize) < pageSize {
+						startPosition = len(tic.Data[hMachine]) - pageSize
+					} else {
+						startPosition = cursorPosition
 					}
 				}
+				drawAll()
+			case termbox.KeyPgup:
+				_, h := termbox.Size()
+				pageSize := h - dataStartRow
+				if cursorPosition-pageSize < 0 {
+					cursorPosition = 0
+					startPosition = 0
+				} else {
+					cursorPosition -= pageSize
+					if cursorPosition < pageSize {
+						startPosition = 0
+					} else {
+						startPosition = cursorPosition
+					}
+				}
+				drawAll()
 			case termbox.KeyEsc:
 				break loop
 			}
