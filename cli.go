@@ -106,10 +106,20 @@ func formatAtIndex(i int) {
 		formatStorage(i, d)
 		formatCons(i, d)
 		formatUptime(i, d)
+		delete(errorLayer, i)
 	} else {
+		clearInfo(i)
 		errorLayer[i] = d.FetchingError
 	}
-	formatMachine(i, d)
+	formatName(i, d)
+}
+
+func clearInfo(i int) {
+	for j := 2; j < len(tic.Header); j++ {
+		s := newStyledText()
+		appendNoData(&s, i)
+		tic.Data[tic.Header[j]][i] = s
+	}
 }
 
 func appendSilent(s *StyledText, i int) {
@@ -158,7 +168,7 @@ func addBgColor(s *StyledText, i int) {
 	}
 }
 
-func formatMachine(i int, d *Data) {
+func formatName(i int, d *Data) {
 	s := newStyledText()
 	name := d.Machine
 	if showIPs {
@@ -388,22 +398,11 @@ func drawAtIndex(i int, flush bool) {
 		bg = selectedBg
 	}
 	for j := 0; j < w; j++ {
-
 		termbox.SetCell(j, row, ' ', termbox.ColorDefault, bg)
 	}
 	currentTab := 1
 	for _, he := range tic.Header {
-		position := currentTab
-		s := tic.Data[he][i]
-		if tic.ColumnAlignment[he] == AlignCentre {
-			position += ((tic.ColumnWidth[he] - len(s.Runes)) / 2)
-		} else if tic.ColumnAlignment[he] == AlignRight {
-			position += (tic.ColumnWidth[he] - len(s.Runes))
-		}
-		for j := 0; j < len(s.Runes); j++ {
-			termbox.SetCell(position+j, row, s.Runes[j], s.FG[j], s.BG[j])
-		}
-		currentTab += tic.ColumnWidth[he] + 1
+		addRowToHeader(he, &currentTab, row, i)
 	}
 	if v, ok := errorLayer[i]; ok {
 		fg := termbox.ColorRed
@@ -417,6 +416,20 @@ func drawAtIndex(i int, flush bool) {
 	if flush {
 		termbox.Flush()
 	}
+}
+
+func addRowToHeader(he string, currentTab *int, row, i int) {
+	position := *currentTab
+	s := tic.Data[he][i]
+	if tic.ColumnAlignment[he] == AlignCentre {
+		position += ((tic.ColumnWidth[he] - len(s.Runes)) / 2)
+	} else if tic.ColumnAlignment[he] == AlignRight {
+		position += (tic.ColumnWidth[he] - len(s.Runes))
+	}
+	for j := 0; j < len(s.Runes); j++ {
+		termbox.SetCell(position+j, row, s.Runes[j], s.FG[j], s.BG[j])
+	}
+	*currentTab += tic.ColumnWidth[he] + 1
 }
 
 func adjustStartPosition() {
@@ -451,6 +464,7 @@ loop:
 			case termbox.KeyCtrlR:
 				if !running {
 					go func() {
+						fetchTime = time.Now()
 						drawDate()
 						runAllHosts(command)
 					}()
