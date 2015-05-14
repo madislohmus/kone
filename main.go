@@ -15,7 +15,7 @@ import (
 var (
 	wg         sync.WaitGroup
 	command    = `uptime | awk '{print $(NF-2) $(NF-1) $NF}' && free | grep Mem | awk '{print ($3-$6-$7)/$2}' && netstat -ant | wc -l && nproc && df -h / | grep '/' | awk '{print $5}' && cat /proc/uptime | awk '{print $1}' && top -b -n2 | grep "Cpu(s)"|tail -n 1 | awk '{print $2 + $4}'`
-	machines   map[string]Machine
+	machines   map[string]*Machine
 	signer     *ssh.Signer
 	sortedKeys []string
 	data       map[string]*Data
@@ -30,13 +30,14 @@ func runAllHosts(command string) {
 		go func(key string) {
 			data[key].Fetching = true
 			drawMachine(key)
-			config := gosh.Config{
-				User:    machines[key].User,
-				Host:    machines[key].IP,
-				Port:    machines[key].Port,
-				Timeout: 15 * time.Second,
-				Signer:  signer}
-			result, err := gosh.Run(command, config)
+			var err error
+			var result string
+			if machines[key].client == nil {
+				machines[key].client, err = gosh.GetClient(*machines[key].config)
+			}
+			if machines[key].client != nil {
+				result, err = gosh.RunOnClient(command, *machines[key].client, 15*time.Second)
+			}
 			if err != nil {
 				data[key].GotResult = false
 				data[key].Fetching = false
@@ -139,15 +140,19 @@ func populateMachines() error {
 	if err != nil {
 		return err
 	}
-	machines = make(map[string]Machine)
+	machines = make(map[string]*Machine)
 	for _, line := range strings.Split(string(data), "\n") {
 		m := strings.Split(line, ",")
 		if len(m) > 3 {
-			machines[strings.TrimSpace(m[0])] = Machine{
-				Name: strings.TrimSpace(m[0]),
-				User: strings.TrimSpace(m[1]),
-				IP:   strings.TrimSpace(m[2]),
-				Port: strings.TrimSpace(m[3])}
+			config := gosh.Config{
+				User:    strings.TrimSpace(m[1]),
+				Host:    strings.TrimSpace(m[2]),
+				Port:    strings.TrimSpace(m[3]),
+				Timeout: 15 * time.Second,
+				Signer:  signer}
+			machines[strings.TrimSpace(m[0])] = &Machine{
+				Name:   strings.TrimSpace(m[0]),
+				config: &config}
 		}
 	}
 	return nil
@@ -168,16 +173,16 @@ func main() {
 		fmt.Println("Could not get signer!")
 		return
 	}
+	signer = s
 	if err := populateMachines(); err != nil {
 		fmt.Printf("%s", err.Error())
 		return
 	}
 	Init(machines)
-	signer = s
 	data = make(map[string]*Data)
 	for k, v := range machines {
 		sortedKeys = append(sortedKeys, k)
-		data[k] = &Data{Machine: k, IP: v.IP}
+		data[k] = &Data{Machine: k, IP: v.config.Host}
 	}
 
 	srt := Sorter{data: sortedKeys}
@@ -194,4 +199,5 @@ func main() {
 		}
 	}()
 	runCli()
+
 }

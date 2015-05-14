@@ -2,7 +2,9 @@ package main
 
 import (
 	"flag"
+	"github.com/madislohmus/gosh"
 	"github.com/nsf/termbox-go"
+	"golang.org/x/crypto/ssh"
 	"strings"
 )
 
@@ -45,10 +47,9 @@ type (
 	}
 
 	Machine struct {
-		Name string
-		User string
-		IP   string
-		Port string
+		Name   string
+		config *gosh.Config
+		client *ssh.Client
 	}
 )
 

@@ -38,7 +38,7 @@ func newStyledText() StyledText {
 	return StyledText{Runes: make([]rune, 0), FG: make([]termbox.Attribute, 0), BG: make([]termbox.Attribute, 0)}
 }
 
-func Init(m map[string]Machine) {
+func Init(m map[string]*Machine) {
 	tic = TextInColumns{}
 	errorLayer = make(map[int]string)
 	tic.Header = []string{hIndex, hMachine, hLoad1, hLoad5, hLoad15, hCPU, hFree, hStorage, hCons, hUptime}
@@ -445,7 +445,7 @@ func adjustStartPosition() {
 
 func openConsole() {
 	name := machines[sortedKeys[cursorPosition]].Name
-	user := machines[sortedKeys[cursorPosition]].User
+	user := machines[sortedKeys[cursorPosition]].config.User
 	cmd := exec.Command("urxvt", "-e", "ssh", fmt.Sprintf("%s@%s", user, name))
 	go func() {
 		err := cmd.Run()
