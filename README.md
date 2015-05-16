@@ -17,3 +17,6 @@ Key file is for example ~/.ssh/id_rsa, and password file is a file that contains
 
 ## Screenshot
 ![Screenshot](/../screenshot/output.gif?raw=true "Screenshot")
+
+##Acknowledgements
+Written using [termbox-go](https://github.com/nsf/termbox-go) library
