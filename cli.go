@@ -17,7 +17,7 @@ var (
 	hLoad15    = "l15"
 	hCPU       = "CPU"
 	hFree      = "free"
-	hStorage   = "df /"
+	hStorage   = "/"
 	hCons      = "conns"
 	hUptime    = "uptime"
 
@@ -251,6 +251,15 @@ func formatCPU(i int, d *Data) {
 					s.FG = append(s.FG, 2|termbox.AttrBold)
 					d.Status |= StatusError
 				}
+			}
+			addBgColor(&s, i)
+		}
+		for _, r := range fmt.Sprintf(":%d", d.Nproc) {
+			s.Runes = append(s.Runes, r)
+			if cursorPosition == i {
+				s.FG = append(s.FG, selectedFg)
+			} else {
+				s.FG = append(s.FG, 9)
 			}
 			addBgColor(&s, i)
 		}
