@@ -68,7 +68,7 @@ func Init(m map[string]*Machine) {
 }
 
 func drawAll() {
-	for i, _ := range sortedKeys {
+	for i, _ := range sorter.keys {
 		formatAtIndex(i)
 	}
 	redraw()
@@ -79,24 +79,23 @@ func redraw() {
 	adjustStartPosition()
 	drawDate()
 	drawHeader()
-	for i, _ := range sortedKeys {
+	for i, _ := range sorter.keys {
 		drawAtIndex(i, false)
 	}
 	termbox.Flush()
 }
 
 func drawMachine(machine string) {
-	for idx, _ := range sortedKeys {
-		if sortedKeys[idx] == machine {
+	for idx, _ := range sorter.keys {
+		if sorter.keys[idx] == machine {
 			formatAtIndex(idx)
-			drawAtIndex(idx, true)
 			break
 		}
 	}
 }
 
 func formatAtIndex(i int) {
-	d := data[sortedKeys[i]]
+	d := data[sorter.keys[i]]
 	d.Status = StatusOK
 	formatIndex(i, d)
 	if d.GotResult {
@@ -453,8 +452,8 @@ func adjustStartPosition() {
 }
 
 func openConsole() {
-	name := machines[sortedKeys[cursorPosition]].Name
-	user := machines[sortedKeys[cursorPosition]].config.User
+	name := machines[sorter.keys[cursorPosition]].Name
+	user := machines[sorter.keys[cursorPosition]].config.User
 	cmd := exec.Command("urxvt", "-e", "ssh", fmt.Sprintf("%s@%s", user, name))
 	go func() {
 		err := cmd.Run()
@@ -551,11 +550,11 @@ loop:
 				showIPs = !showIPs
 				drawAll()
 			case 114:
-				if !data[sortedKeys[cursorPosition]].Fetching {
+				if !data[sorter.keys[cursorPosition]].Fetching {
 					go func() {
 						fetchTime = time.Now()
 						drawDate()
-						RunOnHost(machines[sortedKeys[cursorPosition]].Name)
+						RunOnHost(machines[sorter.keys[cursorPosition]].Name)
 					}()
 				}
 			}

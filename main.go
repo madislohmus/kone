@@ -13,14 +13,14 @@ import (
 )
 
 var (
-	wg         sync.WaitGroup
-	command    = `uptime | awk '{print $(NF-2) $(NF-1) $NF}' && free | grep Mem | awk '{print ($3-$6-$7)/$2}' && netstat -ant | wc -l && nproc && df -h / | grep '/' | awk '{print $5}' && cat /proc/uptime | awk '{print $1}' && top -b -n2 | grep "Cpu(s)"|tail -n 1 | awk '{print $2 + $4}'`
-	machines   map[string]*Machine
-	signer     *ssh.Signer
-	sortedKeys []string
-	data       map[string]*Data
-	running    bool
-	fetchTime  time.Time
+	wg        sync.WaitGroup
+	command   = `uptime | awk '{print $(NF-2) $(NF-1) $NF}' && free | grep Mem | awk '{print ($3-$6-$7)/$2}' && netstat -ant | wc -l && nproc && df -h / | grep '/' | awk '{print $5}' && cat /proc/uptime | awk '{print $1}' && top -b -n2 | grep "Cpu(s)"|tail -n 1 | awk '{print $2 + $4}'`
+	machines  map[string]*Machine
+	signer    *ssh.Signer
+	sorter    Sorter
+	data      map[string]*Data
+	running   bool
+	fetchTime time.Time
 )
 
 func RunOnHost(machine string) {
@@ -65,6 +65,8 @@ func runOnHost(command string, machine string) {
 			populate(data[key], result)
 			drawMachine(key)
 		}
+		sort.Sort(sorter)
+		drawAll()
 		wg.Done()
 	}(machine)
 }
@@ -194,13 +196,10 @@ func main() {
 	Init(machines)
 	data = make(map[string]*Data)
 	for k, v := range machines {
-		sortedKeys = append(sortedKeys, k)
+		sorter.keys = append(sorter.keys, k)
 		data[k] = &Data{Machine: k, IP: v.config.Host}
 	}
-
-	srt := Sorter{data: sortedKeys}
-	sort.Sort(srt)
-
+	sort.Sort(sorter)
 	go func() {
 		for {
 			if !running {
