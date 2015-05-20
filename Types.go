@@ -61,6 +61,7 @@ const (
 	StatusOK int = 1 << iota
 	StatusWarning
 	StatusError
+	StatusUnknown
 )
 
 var (
@@ -81,35 +82,13 @@ func (s Sorter) Swap(i, j int) {
 func (s Sorter) Less(i, j int) bool {
 	m1 := data[s.keys[i]]
 	m2 := data[s.keys[j]]
-	if m1.Fetching && m2.Fetching {
+
+	if m1.Status == m2.Status {
 		return sortByName(m1, m2)
-	} else if !m1.Fetching && !m2.Fetching {
-		if m1.GotResult && m2.GotResult {
-			return sortByStatus(m1, m2)
-		} else if !m1.GotResult && !m2.GotResult {
-			return sortByName(m1, m2)
-		} else {
-			return m2.GotResult
-		}
-	} else if m1.Fetching {
-		if m2.GotResult {
-			if m2.Status == StatusOK {
-				return sortByName(m1, m2)
-			}
-			return false
-		} else {
-			return false
-		}
 	} else {
-		if m1.GotResult {
-			if m1.Status == StatusOK {
-				return sortByName(m1, m2)
-			}
-			return true
-		} else {
-			return true
-		}
+		return m1.Status > m2.Status
 	}
+
 }
 
 func sortByName(m1, m2 *Data) bool {

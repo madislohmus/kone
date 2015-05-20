@@ -23,31 +23,34 @@ var (
 	fetchTime time.Time
 )
 
-func RunOnHost(machine string) {
+func RunOnHost(machine string, forceReConnect bool) {
 	if data[machine].Fetching {
 		return
 	}
 	wg.Add(1)
-	runOnHost(command, machine)
+	runOnHost(command, machine, forceReConnect)
 	wg.Wait()
 }
 
-func RunOnHosts() {
+func RunOnHosts(forceReConnect bool) {
 	for k, _ := range machines {
 		if !data[k].Fetching {
 			wg.Add(1)
-			runOnHost(command, k)
+			runOnHost(command, k, forceReConnect)
 		}
 	}
 	wg.Wait()
 }
 
-func runOnHost(command string, machine string) {
+func runOnHost(command string, machine string, forceReConnect bool) {
 	go func(key string) {
 		data[key].Fetching = true
 		var err error
 		var result string
-		if machines[key].client == nil {
+		if machines[key].client == nil || forceReConnect {
+			if forceReConnect {
+				fmt.Printf("FORCING RECONNECT")
+			}
 			machines[key].client, err = gosh.GetClient(*machines[key].config, 15*time.Second)
 		}
 		if machines[key].client != nil {
@@ -57,14 +60,14 @@ func runOnHost(command string, machine string) {
 		if err != nil {
 			data[key].GotResult = false
 			data[key].FetchingError = err.Error()
-			data[key].Status = StatusError
+			data[key].Status |= StatusUnknown
 		} else {
 			data[key].GotResult = true
 			populate(data[key], result)
 			setMachineStatus(data[key])
 		}
 		sort.Sort(sorter)
-		drawMachine(key)
+		formatMachine(key)
 		redraw()
 		wg.Done()
 	}(machine)
@@ -173,9 +176,9 @@ func setMachineStatus(data *Data) {
 }
 
 func loadStatus(load float32, nproc int32) int {
-	if load >= 0.8*(float32(nproc)) {
-		return StatusWarning
-	} else if load >= 0.9*(float32(nproc)) {
+	if load >= 0.9*(float32(nproc)) {
+		return StatusError
+	} else if load >= 0.8*(float32(nproc)) {
 		return StatusError
 	}
 	return StatusOK
@@ -240,14 +243,16 @@ func main() {
 	for k, v := range machines {
 		sorter.keys = append(sorter.keys, k)
 		data[k] = &Data{Machine: k, IP: v.config.Host}
+		formatMachine(k)
 	}
 	sort.Sort(sorter)
+
 	go func() {
 		for {
 			if !running {
 				fetchTime = time.Now()
 				drawDate()
-				RunOnHosts()
+				RunOnHosts(false)
 			}
 			time.Sleep(time.Duration(*sleepTime) * time.Second)
 		}
