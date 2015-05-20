@@ -23,37 +23,50 @@ var (
 	fetchTime  time.Time
 )
 
-func runAllHosts(command string) {
-	running = true
+func RunOnHost(machine string) {
+	if data[machine].Fetching {
+		return
+	}
+	wg.Add(1)
+	runOnHost(command, machine)
+	wg.Wait()
+}
+
+func RunOnHosts() {
 	for k, _ := range machines {
-		wg.Add(1)
-		go func(key string) {
-			data[key].Fetching = true
-			drawMachine(key)
-			var err error
-			var result string
-			if machines[key].client == nil {
-				machines[key].client, err = gosh.GetClient(*machines[key].config)
-			}
-			if machines[key].client != nil {
-				result, err = gosh.RunOnClient(command, *machines[key].client, 15*time.Second)
-			}
-			if err != nil {
-				data[key].GotResult = false
-				data[key].Fetching = false
-				data[key].FetchingError = err.Error()
-				drawMachine(key)
-			} else {
-				data[key].GotResult = true
-				data[key].Fetching = false
-				populate(data[key], result)
-				drawMachine(key)
-			}
-			wg.Done()
-		}(k)
+		if !data[k].Fetching {
+			wg.Add(1)
+			runOnHost(command, k)
+		}
 	}
 	wg.Wait()
-	running = false
+}
+
+func runOnHost(command string, machine string) {
+	go func(key string) {
+		data[key].Fetching = true
+		drawMachine(key)
+		var err error
+		var result string
+		if machines[key].client == nil {
+			machines[key].client, err = gosh.GetClient(*machines[key].config, 15*time.Second)
+		}
+		if machines[key].client != nil {
+			result, err = gosh.RunOnClient(command, *machines[key].client, 15*time.Second)
+		}
+		if err != nil {
+			data[key].GotResult = false
+			data[key].Fetching = false
+			data[key].FetchingError = err.Error()
+			drawMachine(key)
+		} else {
+			data[key].GotResult = true
+			data[key].Fetching = false
+			populate(data[key], result)
+			drawMachine(key)
+		}
+		wg.Done()
+	}(machine)
 }
 
 func populate(data *Data, result string) {
@@ -193,7 +206,7 @@ func main() {
 			if !running {
 				fetchTime = time.Now()
 				drawDate()
-				runAllHosts(command)
+				RunOnHosts()
 			}
 			time.Sleep(time.Duration(*sleepTime) * time.Second)
 		}

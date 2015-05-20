@@ -475,7 +475,7 @@ loop:
 					go func() {
 						fetchTime = time.Now()
 						drawDate()
-						runAllHosts(command)
+						RunOnHosts()
 					}()
 				}
 			case termbox.KeyArrowUp:
@@ -550,6 +550,14 @@ loop:
 			case 105:
 				showIPs = !showIPs
 				drawAll()
+			case 114:
+				if !data[sortedKeys[cursorPosition]].Fetching {
+					go func() {
+						fetchTime = time.Now()
+						drawDate()
+						RunOnHost(machines[sortedKeys[cursorPosition]].Name)
+					}()
+				}
 			}
 		case termbox.EventResize:
 			drawAll()
