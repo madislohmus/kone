@@ -96,7 +96,6 @@ func drawMachine(machine string) {
 
 func formatAtIndex(i int) {
 	d := data[sorter.keys[i]]
-	d.Status = StatusOK
 	formatIndex(i, d)
 	if d.GotResult {
 		formatLoads(i, d)
@@ -219,10 +218,8 @@ func formatLoad(load float32, d *Data, i int) *StyledText {
 					s.FG = append(s.FG, 3)
 				} else if load < float32(d.Nproc) {
 					s.FG = append(s.FG, 4|termbox.AttrBold)
-					d.Status |= StatusWarning
 				} else {
 					s.FG = append(s.FG, 2|termbox.AttrBold)
-					d.Status |= StatusError
 				}
 			}
 			addBgColor(&s, i)
@@ -245,10 +242,8 @@ func formatCPU(i int, d *Data) {
 					s.FG = append(s.FG, 3)
 				} else if d.CPU < float32(90*d.Nproc) {
 					s.FG = append(s.FG, 4|termbox.AttrBold)
-					d.Status |= StatusWarning
 				} else {
 					s.FG = append(s.FG, 2|termbox.AttrBold)
-					d.Status |= StatusError
 				}
 			}
 			addBgColor(&s, i)
@@ -280,10 +275,8 @@ func formatFree(i int, d *Data) {
 					s.FG = append(s.FG, 3)
 				} else if d.Free < 0.9 {
 					s.FG = append(s.FG, 4|termbox.AttrBold)
-					d.Status |= StatusWarning
 				} else {
 					s.FG = append(s.FG, 2|termbox.AttrBold)
-					d.Status |= StatusError
 				}
 			}
 			addBgColor(&s, i)
@@ -306,10 +299,8 @@ func formatStorage(i int, d *Data) {
 					s.FG = append(s.FG, 3)
 				} else if d.Free < 90 {
 					s.FG = append(s.FG, 4|termbox.AttrBold)
-					d.Status |= StatusWarning
 				} else {
 					s.FG = append(s.FG, 2|termbox.AttrBold)
-					d.Status |= StatusError
 				}
 			}
 			addBgColor(&s, i)
@@ -328,14 +319,12 @@ func formatCons(i int, d *Data) {
 			if cursorPosition == i {
 				s.FG = append(s.FG, selectedFg)
 			} else {
-				if d.Connections < 1000 {
+				if d.Connections < 10000 {
 					s.FG = append(s.FG, 3)
-				} else if d.Connections < 10000 {
+				} else if d.Connections < 50000 {
 					s.FG = append(s.FG, 4|termbox.AttrBold)
-					d.Status |= StatusWarning
 				} else {
 					s.FG = append(s.FG, 2|termbox.AttrBold)
-					d.Status |= StatusError
 				}
 			}
 			addBgColor(&s, i)

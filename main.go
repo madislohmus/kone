@@ -45,7 +45,6 @@ func RunOnHosts() {
 func runOnHost(command string, machine string) {
 	go func(key string) {
 		data[key].Fetching = true
-		drawMachine(key)
 		var err error
 		var result string
 		if machines[key].client == nil {
@@ -54,19 +53,19 @@ func runOnHost(command string, machine string) {
 		if machines[key].client != nil {
 			result, err = gosh.RunOnClient(command, *machines[key].client, 15*time.Second)
 		}
+		data[key].Fetching = false
 		if err != nil {
 			data[key].GotResult = false
-			data[key].Fetching = false
 			data[key].FetchingError = err.Error()
-			drawMachine(key)
+			data[key].Status = StatusError
 		} else {
 			data[key].GotResult = true
-			data[key].Fetching = false
 			populate(data[key], result)
-			drawMachine(key)
+			setMachineStatus(data[key])
 		}
 		sort.Sort(sorter)
-		drawAll()
+		drawMachine(key)
+		redraw()
 		wg.Done()
 	}(machine)
 }
@@ -137,6 +136,49 @@ func populate(data *Data, result string) {
 		data.CPU = float32(cpu)
 	}
 
+}
+
+func setMachineStatus(data *Data) {
+
+	data.Status = StatusOK
+
+	data.Status |= loadStatus(data.Load1, data.Nproc)
+	data.Status |= loadStatus(data.Load5, data.Nproc)
+	data.Status |= loadStatus(data.Load15, data.Nproc)
+
+	if data.CPU >= 80*(float32(data.Nproc)) {
+		data.Status |= StatusWarning
+	} else if data.CPU >= 90*(float32(data.Nproc)) {
+		data.Status |= StatusError
+	}
+
+	if data.Free >= 0.8 {
+		data.Status |= StatusWarning
+	} else if data.Free >= 0.9 {
+		data.Status |= StatusError
+	}
+
+	if data.Storage >= 80 {
+		data.Status |= StatusWarning
+	} else if data.Storage >= 90 {
+		data.Status |= StatusError
+	}
+
+	if data.Connections > 10000 {
+		data.Status |= StatusWarning
+	} else if data.Connections > 50000 {
+		data.Status |= StatusError
+	}
+
+}
+
+func loadStatus(load float32, nproc int32) int {
+	if load >= 0.8*(float32(nproc)) {
+		return StatusWarning
+	} else if load >= 0.9*(float32(nproc)) {
+		return StatusError
+	}
+	return StatusOK
 }
 
 func getPassword() ([]byte, error) {
