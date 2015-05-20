@@ -48,9 +48,6 @@ func runOnHost(command string, machine string, forceReConnect bool) {
 		var err error
 		var result string
 		if machines[key].client == nil || forceReConnect {
-			if forceReConnect {
-				fmt.Printf("FORCING RECONNECT")
-			}
 			machines[key].client, err = gosh.GetClient(*machines[key].config, 15*time.Second)
 		}
 		if machines[key].client != nil {
