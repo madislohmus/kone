@@ -173,12 +173,12 @@ func setMachineStatus(data *Data) {
 }
 
 func loadStatus(load float32, nproc int32) int {
-	if load >= float32(nproc) {
-		return StatusError
-	} else if load >= 0.8*(float32(nproc)) {
+	if load < float32(nproc)*0.8 {
+		return StatusOK
+	} else if load < float32(nproc) {
 		return StatusWarning
 	}
-	return StatusOK
+	return StatusError
 }
 
 func getPassword() ([]byte, error) {
