@@ -173,10 +173,10 @@ func setMachineStatus(data *Data) {
 }
 
 func loadStatus(load float32, nproc int32) int {
-	if load >= 0.9*(float32(nproc)) {
+	if load >= float32(nproc) {
 		return StatusError
 	} else if load >= 0.8*(float32(nproc)) {
-		return StatusError
+		return StatusWarning
 	}
 	return StatusOK
 }
