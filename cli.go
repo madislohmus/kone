@@ -27,8 +27,9 @@ var (
 	startPosition  = 0
 	cursorPosition = 0
 
-	silent  bool
-	showIPs bool
+	silent         bool
+	showIPs        bool
+	forceReConnect bool
 
 	selectedBg = termbox.ColorBlack | termbox.AttrBold
 	selectedFg = termbox.ColorWhite | termbox.AttrBold
@@ -299,7 +300,7 @@ func drawHeader() {
 			position += (tic.ColumnWidth[h] - len(h))
 		}
 		for j, r := range h {
-			termbox.SetCell(position+j, headerRow, r, 9|termbox.AttrBold, termbox.ColorDefault)
+			termbox.SetCell(3+position+j, headerRow, r, 9|termbox.AttrBold, termbox.ColorDefault)
 		}
 		currentTab += tic.ColumnWidth[h] + 1
 	}
@@ -408,12 +409,15 @@ loop:
 			switch ev.Key {
 			case termbox.KeyCtrlR:
 				if !running {
-					go func() {
+					go func(forceReConnect bool) {
 						fetchTime = time.Now()
 						drawDate()
-						RunOnHosts(false)
-					}()
+						RunOnHosts(forceReConnect)
+					}(forceReConnect)
+					forceReConnect = false
 				}
+			case termbox.KeyCtrlF:
+				forceReConnect = true
 			case termbox.KeyArrowUp:
 				if cursorPosition > 0 {
 					if cursorPosition == startPosition {
@@ -490,19 +494,12 @@ loop:
 				redraw()
 			case 114: // r
 				if !data[sorter.keys[cursorPosition]].Fetching {
-					go func() {
+					go func(forceReConnect bool) {
 						fetchTime = time.Now()
 						drawDate()
-						RunOnHost(machines[sorter.keys[cursorPosition]].Name, false)
-					}()
-				}
-			case 82: // R
-				if !data[sorter.keys[cursorPosition]].Fetching {
-					go func() {
-						fetchTime = time.Now()
-						drawDate()
-						RunOnHost(machines[sorter.keys[cursorPosition]].Name, true)
-					}()
+						RunOnHost(machines[sorter.keys[cursorPosition]].Name, forceReConnect)
+					}(forceReConnect)
+					forceReConnect = false
 				}
 			}
 		case termbox.EventResize:

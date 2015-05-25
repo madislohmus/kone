@@ -5,6 +5,7 @@ import (
 	"github.com/madislohmus/gosh"
 	"golang.org/x/crypto/ssh"
 	"io/ioutil"
+	"net"
 	"sort"
 	"strconv"
 	"strings"
@@ -52,6 +53,11 @@ func runOnHost(command string, machine string, forceReConnect bool) {
 		}
 		if machines[key].client != nil {
 			result, err = gosh.RunOnClient(command, *machines[key].client, 15*time.Second)
+			if op, ok := err.(*net.OpError); ok {
+				if !op.Timeout() {
+					machines[key].client = nil
+				}
+			}
 		}
 		data[key].Fetching = false
 		if err != nil {
@@ -146,28 +152,28 @@ func setMachineStatus(data *Data) {
 	data.Status |= loadStatus(data.Load5, data.Nproc)
 	data.Status |= loadStatus(data.Load15, data.Nproc)
 
-	if data.CPU >= 80*(float32(data.Nproc)) {
-		data.Status |= StatusWarning
-	} else if data.CPU >= 90*(float32(data.Nproc)) {
+	if data.CPU >= 90*(float32(data.Nproc)) {
 		data.Status |= StatusError
+	} else if data.CPU >= 80*(float32(data.Nproc)) {
+		data.Status |= StatusWarning
 	}
 
-	if data.Free >= 0.8 {
-		data.Status |= StatusWarning
-	} else if data.Free >= 0.9 {
+	if data.Free >= 0.9 {
 		data.Status |= StatusError
+	} else if data.Free >= 0.8 {
+		data.Status |= StatusWarning
 	}
 
-	if data.Storage >= 80 {
-		data.Status |= StatusWarning
-	} else if data.Storage >= 90 {
+	if data.Storage >= 90 {
 		data.Status |= StatusError
+	} else if data.Storage >= 80 {
+		data.Status |= StatusWarning
 	}
 
-	if data.Connections > 10000 {
-		data.Status |= StatusWarning
-	} else if data.Connections > 50000 {
+	if data.Connections > 50000 {
 		data.Status |= StatusError
+	} else if data.Connections > 10000 {
+		data.Status |= StatusWarning
 	}
 
 }
