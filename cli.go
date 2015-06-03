@@ -106,7 +106,9 @@ func formatMachine(machine string) {
 		delete(errorLayer, machine)
 	} else {
 		clearInfo(machine)
-		errorLayer[machine] = d.FetchingError
+		if len(d.FetchingError) > 0 {
+			errorLayer[machine] = d.FetchingError
+		}
 	}
 	formatName(d)
 }
@@ -397,7 +399,11 @@ func drawAtIndex(i int, flush bool) {
 		if selected {
 			fg = selectedFg
 		}
-		for j, r := range v {
+		label := v
+		if silent {
+			label = "E"
+		}
+		for j, r := range label {
 			termbox.SetCell(len(index)+tic.ColumnWidth[hMachine]+j+3, row, r, fg, bg)
 		}
 	}
