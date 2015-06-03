@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"github.com/nsf/termbox-go"
 	"os/exec"
+	"sync"
 	"time"
 )
 
@@ -18,6 +19,7 @@ var (
 	hCPU          = "CPU"
 	hFree         = "free"
 	hStorage      = "/"
+	hInode        = "inode"
 	hCons         = "conns"
 	hUptime       = "uptime"
 
@@ -33,6 +35,8 @@ var (
 
 	selectedBg = termbox.ColorBlack | termbox.AttrBold
 	selectedFg = termbox.ColorWhite | termbox.AttrBold
+
+	mutex sync.Mutex
 )
 
 func newStyledText() StyledText {
@@ -42,7 +46,7 @@ func newStyledText() StyledText {
 func Init(m map[string]*Machine) {
 	tic = TextInColumns{}
 	errorLayer = make(map[string]string)
-	tic.Header = []string{hMachine, hLoad1, hLoad5, hLoad15, hCPU, hFree, hStorage, hCons, hUptime}
+	tic.Header = []string{hMachine, hLoad1, hLoad5, hLoad15, hCPU, hFree, hStorage, hInode, hCons, hUptime}
 	tic.Data = make(map[string][]StyledText)
 	tic.ColumnWidth = make(map[string]int)
 	headerToIndex = make(map[string]int)
@@ -58,6 +62,7 @@ func Init(m map[string]*Machine) {
 		hCPU:     AlignRight,
 		hFree:    AlignRight,
 		hStorage: AlignRight,
+		hInode:   AlignRight,
 		hCons:    AlignRight,
 		hUptime:  AlignLeft,
 	}
@@ -77,7 +82,9 @@ func redraw() {
 	for i, _ := range sorter.keys {
 		drawAtIndex(i, false)
 	}
+	mutex.Lock()
 	termbox.Flush()
+	mutex.Unlock()
 }
 
 func formatAll() {
@@ -93,6 +100,7 @@ func formatMachine(machine string) {
 		formatCPU(d)
 		formatFree(d)
 		formatStorage(d)
+		formatInode(d)
 		formatCons(d)
 		formatUptime(d)
 		delete(errorLayer, machine)
@@ -239,7 +247,7 @@ func formatStorage(d *Data) {
 			s.Runes = append(s.Runes, r)
 			if d.Storage < 80 {
 				s.FG = append(s.FG, 3)
-			} else if d.Free < 90 {
+			} else if d.Storage < 90 {
 				s.FG = append(s.FG, 4|termbox.AttrBold)
 			} else {
 				s.FG = append(s.FG, 2|termbox.AttrBold)
@@ -248,6 +256,26 @@ func formatStorage(d *Data) {
 		}
 	}
 	rowToHeader(&s, d.Machine, hStorage)
+}
+
+func formatInode(d *Data) {
+	s := newStyledText()
+	if silent && d.Inode < 80 {
+		appendSilent(&s)
+	} else {
+		for _, r := range fmt.Sprintf("%3d", d.Inode) {
+			s.Runes = append(s.Runes, r)
+			if d.Inode < 80 {
+				s.FG = append(s.FG, 3)
+			} else if d.Inode < 90 {
+				s.FG = append(s.FG, 4|termbox.AttrBold)
+			} else {
+				s.FG = append(s.FG, 2|termbox.AttrBold)
+			}
+			s.BG = append(s.BG, termbox.ColorDefault)
+		}
+	}
+	rowToHeader(&s, d.Machine, hInode)
 }
 
 func formatCons(d *Data) {

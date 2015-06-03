@@ -15,7 +15,7 @@ import (
 
 var (
 	wg        sync.WaitGroup
-	command   = `uptime | awk '{print $(NF-2) $(NF-1) $NF}' && free | grep Mem | awk '{print ($3-$6-$7)/$2}' && netstat -ant | wc -l && nproc && df -h / | grep '/' | awk '{print $5}' && cat /proc/uptime | awk '{print $1}' && top -b -n2 | grep "Cpu(s)"|tail -n 1 | awk '{print $2 + $4}'`
+	command   = `uptime | awk '{print $(NF-2) $(NF-1) $NF}' && free | grep Mem | awk '{print ($3-$6-$7)/$2}' && netstat -ant | wc -l && nproc && df / | grep '/' | awk '{print $5}' && df -i / | grep '/' | awk '{print $5}' && cat /proc/uptime | awk '{print $1}' && top -b -n2 | grep "Cpu(s)"|tail -n 1 | awk '{print $2 + $4}'`
 	machines  map[string]*Machine
 	signer    *ssh.Signer
 	sorter    Sorter
@@ -128,14 +128,21 @@ func populate(data *Data, result string) {
 		data.Storage = int32(stor)
 	}
 
-	ut, err := strconv.ParseFloat(s[5], 10)
+	inode, err := strconv.ParseInt(strings.TrimRight(s[5], "%"), 10, 32)
+	if err != nil {
+		inode = -1
+	} else {
+		data.Inode = int32(inode)
+	}
+
+	ut, err := strconv.ParseFloat(s[6], 10)
 	if err != nil {
 		ut = -1
 	} else {
 		data.Uptime = int64(ut)
 	}
 
-	cpu, err := strconv.ParseFloat(s[6], 10)
+	cpu, err := strconv.ParseFloat(s[7], 10)
 	if err != nil {
 		cpu = -1
 	} else {
@@ -167,6 +174,12 @@ func setMachineStatus(data *Data) {
 	if data.Storage >= 90 {
 		data.Status |= StatusError
 	} else if data.Storage >= 80 {
+		data.Status |= StatusWarning
+	}
+
+	if data.Inode >= 90 {
+		data.Status |= StatusError
+	} else if data.Inode >= 80 {
 		data.Status |= StatusWarning
 	}
 

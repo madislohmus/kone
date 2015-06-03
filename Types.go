@@ -18,6 +18,7 @@ type (
 		CPU           float32
 		Free          float32
 		Storage       int32
+		Inode         int32
 		Connections   int32
 		Uptime        int64
 		Nproc         int32
