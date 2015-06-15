@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"github.com/nsf/termbox-go"
+	"math"
 	"os/exec"
 	"sync"
 	"time"
@@ -64,7 +65,7 @@ func Init(m map[string]*Machine) {
 		hStorage: AlignRight,
 		hInode:   AlignRight,
 		hCons:    AlignRight,
-		hUptime:  AlignLeft,
+		hUptime:  AlignRight,
 	}
 	for k, _ := range m {
 		tic.Data[k] = make([]StyledText, len(tic.Header))
@@ -305,7 +306,7 @@ func formatUptime(d *Data) {
 	if silent {
 		appendSilent(&s)
 	} else {
-		for _, r := range time.Duration(time.Duration(d.Uptime) * time.Second).String() {
+		for _, r := range formatDuration(d.Uptime) {
 			s.Runes = append(s.Runes, r)
 			if d.Uptime < 60 {
 				s.FG = append(s.FG, 8)
@@ -345,6 +346,20 @@ func drawDate() {
 	for j, r := range d {
 		termbox.SetCell((w-len(d))/2+j, dateRow, r, 8, termbox.ColorDefault)
 	}
+}
+
+func formatDuration(duration int64) string {
+	h := int64(math.Floor(float64(duration / 3600.0)))
+	m := int64(math.Floor(float64(float64(duration)-float64(3600*h)) / 60.0))
+	s := int64(math.Floor((float64(duration) - float64(3600*h) - float64(60*m))))
+	var hs, ms = "", ""
+	if h > 0 {
+		hs = fmt.Sprintf("%02d:", h)
+	}
+	if h > 0 || m > 0 {
+		ms = fmt.Sprintf("%02d:", m)
+	}
+	return fmt.Sprintf("%s%s%02d", hs, ms, s)
 }
 
 func drawAtIndex(i int, flush bool) {
