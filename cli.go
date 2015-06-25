@@ -95,7 +95,7 @@ func formatAll() {
 }
 
 func formatMachine(machine string) {
-	d := data[machine]
+	d := machines[machine]
 	if d.GotResult {
 		formatLoads(d)
 		formatCPU(d)
@@ -142,11 +142,11 @@ func rowToHeader(s *StyledText, machine string, header string) {
 	}
 }
 
-func formatName(d *Data) {
+func formatName(d *Machine) {
 	s := newStyledText()
-	name := d.Machine
+	name := d.Name
 	if showIPs {
-		name = d.IP
+		name = d.config.Host
 	}
 	for _, r := range name {
 		s.Runes = append(s.Runes, r)
@@ -167,25 +167,26 @@ func formatName(d *Data) {
 		}
 		s.BG = append(s.BG, termbox.ColorDefault)
 	}
-	rowToHeader(&s, d.Machine, hMachine)
+	rowToHeader(&s, d.Name, hMachine)
 }
 
-func formatLoads(d *Data) {
-	rowToHeader(formatLoad(d.Load1, d), d.Machine, hLoad1)
-	rowToHeader(formatLoad(d.Load5, d), d.Machine, hLoad5)
-	rowToHeader(formatLoad(d.Load15, d), d.Machine, hLoad15)
+func formatLoads(d *Machine) {
+	rowToHeader(formatLoad(d.Load1, d), d.Name, hLoad1)
+	rowToHeader(formatLoad(d.Load5, d), d.Name, hLoad5)
+	rowToHeader(formatLoad(d.Load15, d), d.Name, hLoad15)
 }
 
-func formatLoad(load float32, d *Data) *StyledText {
+func formatLoad(load Measurement, d *Machine) *StyledText {
 	s := newStyledText()
-	if silent && load < float32(d.Nproc)*0.8 {
+	lv := load.Value.(float32)
+	if silent && lv < float32(d.Nproc)*0.8 {
 		appendSilent(&s)
 	} else {
-		for _, r := range fmt.Sprintf("%.2f", load) {
+		for _, r := range fmt.Sprintf("%.2f", lv) {
 			s.Runes = append(s.Runes, r)
-			if load < float32(d.Nproc)*0.8 {
+			if lv < float32(d.Nproc)*0.8 {
 				s.FG = append(s.FG, 3)
-			} else if load < float32(d.Nproc) {
+			} else if lv < float32(d.Nproc) {
 				s.FG = append(s.FG, 4|termbox.AttrBold)
 			} else {
 				s.FG = append(s.FG, 2|termbox.AttrBold)
@@ -196,16 +197,17 @@ func formatLoad(load float32, d *Data) *StyledText {
 	return &s
 }
 
-func formatCPU(d *Data) {
+func formatCPU(d *Machine) {
 	s := newStyledText()
-	if silent && d.CPU < float32(80*d.Nproc) {
+	cpu := d.CPU.Value.(float32)
+	if silent && cpu < float32(80*d.Nproc) {
 		appendSilent(&s)
 	} else {
-		for _, r := range fmt.Sprintf("%.1f", d.CPU) {
+		for _, r := range fmt.Sprintf("%.1f", cpu) {
 			s.Runes = append(s.Runes, r)
-			if d.CPU < float32(80*d.Nproc) {
+			if cpu < float32(80*d.Nproc) {
 				s.FG = append(s.FG, 3)
-			} else if d.CPU < float32(90*d.Nproc) {
+			} else if cpu < float32(90*d.Nproc) {
 				s.FG = append(s.FG, 4|termbox.AttrBold)
 			} else {
 				s.FG = append(s.FG, 2|termbox.AttrBold)
@@ -218,19 +220,20 @@ func formatCPU(d *Data) {
 			s.BG = append(s.BG, termbox.ColorDefault)
 		}
 	}
-	rowToHeader(&s, d.Machine, hCPU)
+	rowToHeader(&s, d.Name, hCPU)
 }
 
-func formatFree(d *Data) {
+func formatFree(d *Machine) {
 	s := newStyledText()
-	if silent && d.Free < 0.8 {
+	free := d.Free.Value.(float32)
+	if silent && free < 0.8 {
 		appendSilent(&s)
 	} else {
-		for _, r := range fmt.Sprintf("%.2f", d.Free) {
+		for _, r := range fmt.Sprintf("%.2f", free) {
 			s.Runes = append(s.Runes, r)
-			if d.Free < 0.8 {
+			if free < 0.8 {
 				s.FG = append(s.FG, 3)
-			} else if d.Free < 0.9 {
+			} else if free < 0.9 {
 				s.FG = append(s.FG, 4|termbox.AttrBold)
 			} else {
 				s.FG = append(s.FG, 2|termbox.AttrBold)
@@ -238,19 +241,20 @@ func formatFree(d *Data) {
 			s.BG = append(s.BG, termbox.ColorDefault)
 		}
 	}
-	rowToHeader(&s, d.Machine, hFree)
+	rowToHeader(&s, d.Name, hFree)
 }
 
-func formatStorage(d *Data) {
+func formatStorage(d *Machine) {
 	s := newStyledText()
-	if silent && d.Storage < 80 {
+	storage := d.Storage.Value.(int32)
+	if silent && storage < 80 {
 		appendSilent(&s)
 	} else {
-		for _, r := range fmt.Sprintf("%3d", d.Storage) {
+		for _, r := range fmt.Sprintf("%3d", storage) {
 			s.Runes = append(s.Runes, r)
-			if d.Storage < 80 {
+			if storage < 80 {
 				s.FG = append(s.FG, 3)
-			} else if d.Storage < 90 {
+			} else if storage < 90 {
 				s.FG = append(s.FG, 4|termbox.AttrBold)
 			} else {
 				s.FG = append(s.FG, 2|termbox.AttrBold)
@@ -258,19 +262,20 @@ func formatStorage(d *Data) {
 			s.BG = append(s.BG, termbox.ColorDefault)
 		}
 	}
-	rowToHeader(&s, d.Machine, hStorage)
+	rowToHeader(&s, d.Name, hStorage)
 }
 
-func formatInode(d *Data) {
+func formatInode(d *Machine) {
 	s := newStyledText()
-	if silent && d.Inode < 80 {
+	inode := d.Inode.Value.(int32)
+	if silent && inode < 80 {
 		appendSilent(&s)
 	} else {
-		for _, r := range fmt.Sprintf("%3d", d.Inode) {
+		for _, r := range fmt.Sprintf("%3d", inode) {
 			s.Runes = append(s.Runes, r)
-			if d.Inode < 80 {
+			if inode < 80 {
 				s.FG = append(s.FG, 3)
-			} else if d.Inode < 90 {
+			} else if inode < 90 {
 				s.FG = append(s.FG, 4|termbox.AttrBold)
 			} else {
 				s.FG = append(s.FG, 2|termbox.AttrBold)
@@ -278,19 +283,20 @@ func formatInode(d *Data) {
 			s.BG = append(s.BG, termbox.ColorDefault)
 		}
 	}
-	rowToHeader(&s, d.Machine, hInode)
+	rowToHeader(&s, d.Name, hInode)
 }
 
-func formatCons(d *Data) {
+func formatCons(d *Machine) {
 	s := newStyledText()
-	if silent && d.Connections < 10000 {
+	conns := d.Connections.Value.(int32)
+	if silent && conns < 10000 {
 		appendSilent(&s)
 	} else {
-		for _, r := range fmt.Sprintf("%d", d.Connections) {
+		for _, r := range fmt.Sprintf("%d", conns) {
 			s.Runes = append(s.Runes, r)
-			if d.Connections < 10000 {
+			if conns < 10000 {
 				s.FG = append(s.FG, 3)
-			} else if d.Connections < 50000 {
+			} else if conns < 50000 {
 				s.FG = append(s.FG, 4|termbox.AttrBold)
 			} else {
 				s.FG = append(s.FG, 2|termbox.AttrBold)
@@ -298,10 +304,10 @@ func formatCons(d *Data) {
 			s.BG = append(s.BG, termbox.ColorDefault)
 		}
 	}
-	rowToHeader(&s, d.Machine, hCons)
+	rowToHeader(&s, d.Name, hCons)
 }
 
-func formatUptime(d *Data) {
+func formatUptime(d *Machine) {
 	s := newStyledText()
 	if silent {
 		appendSilent(&s)
@@ -318,7 +324,7 @@ func formatUptime(d *Data) {
 			s.BG = append(s.BG, termbox.ColorDefault)
 		}
 	}
-	rowToHeader(&s, d.Machine, hUptime)
+	rowToHeader(&s, d.Name, hUptime)
 }
 
 func drawHeader() {
@@ -372,7 +378,7 @@ func drawAtIndex(i int, flush bool) {
 	bg := termbox.ColorDefault
 	var indexFg termbox.Attribute
 	indexFg = 9
-	if data[name].Fetching {
+	if machines[name].Fetching {
 		indexFg = termbox.ColorGreen | termbox.AttrBold
 	}
 	selected := cursorPosition == i
@@ -542,7 +548,7 @@ loop:
 				formatAll()
 				redraw()
 			case 114: // r
-				if !data[sorter.keys[cursorPosition]].Fetching {
+				if !machines[sorter.keys[cursorPosition]].Fetching {
 					go func(forceReConnect bool) {
 						fetchTime = time.Now()
 						drawDate()

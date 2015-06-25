@@ -19,13 +19,12 @@ var (
 	machines  map[string]*Machine
 	signer    *ssh.Signer
 	sorter    Sorter
-	data      map[string]*Data
 	running   bool
 	fetchTime time.Time
 )
 
 func RunOnHost(machine string, forceReConnect bool) {
-	if data[machine].Fetching {
+	if machines[machine].Fetching {
 		return
 	}
 	wg.Add(1)
@@ -35,7 +34,7 @@ func RunOnHost(machine string, forceReConnect bool) {
 
 func RunOnHosts(forceReConnect bool) {
 	for k, _ := range machines {
-		if !data[k].Fetching {
+		if !machines[k].Fetching {
 			wg.Add(1)
 			runOnHost(command, k, forceReConnect)
 		}
@@ -45,7 +44,7 @@ func RunOnHosts(forceReConnect bool) {
 
 func runOnHost(command string, machine string, forceReConnect bool) {
 	go func(key string) {
-		data[key].Fetching = true
+		machines[key].Fetching = true
 		var err error
 		var result string
 		if machines[key].client == nil || forceReConnect {
@@ -59,15 +58,15 @@ func runOnHost(command string, machine string, forceReConnect bool) {
 				}
 			}
 		}
-		data[key].Fetching = false
+		machines[key].Fetching = false
 		if err != nil {
-			data[key].GotResult = false
-			data[key].FetchingError = err.Error()
-			data[key].Status |= StatusUnknown
+			machines[key].GotResult = false
+			machines[key].FetchingError = err.Error()
+			machines[key].Status |= StatusUnknown
 		} else {
-			data[key].GotResult = true
-			populate(data[key], result)
-			setMachineStatus(data[key])
+			machines[key].GotResult = true
+			populate(machines[key], result)
+			setMachineStatus(machines[key])
 		}
 		sort.Sort(sorter)
 		formatMachine(key)
@@ -76,117 +75,112 @@ func runOnHost(command string, machine string, forceReConnect bool) {
 	}(machine)
 }
 
-func populate(data *Data, result string) {
+func populate(machines *Machine, result string) {
 	s := strings.Split(result, "\n")
 	loads := strings.Split(s[0], ",")
 	l1, err := strconv.ParseFloat(loads[0], 32)
 	if err != nil {
-		data.Load1 = -1
-	} else {
-		data.Load1 = float32(l1)
+		l1 = -1
 	}
+	machines.Load1 = Measurement{Value: float32(l1)}
 
 	l5, err := strconv.ParseFloat(loads[1], 32)
 	if err != nil {
-		data.Load5 = -1
-	} else {
-		data.Load5 = float32(l5)
+		l5 = -1
 	}
+	machines.Load5 = Measurement{Value: float32(l5)}
 
 	l15, err := strconv.ParseFloat(loads[2], 32)
 	if err != nil {
-		data.Load15 = -1
-	} else {
-		data.Load15 = float32(l15)
+		l15 = -1
 	}
+	machines.Load15 = Measurement{Value: float32(l15)}
 
 	free, err := strconv.ParseFloat(s[1], 32)
 	if err != nil {
 		free = -1
-	} else {
-		data.Free = float32(free)
 	}
+	machines.Free = Measurement{Value: float32(free)}
 
 	conn, err := strconv.ParseInt(s[2], 10, 32)
 	if err != nil {
 		conn = -1
-	} else {
-		data.Connections = int32(conn)
 	}
+	machines.Connections = Measurement{Value: int32(conn)}
 
 	nproc, err := strconv.ParseInt(s[3], 10, 32)
 	if err != nil {
 		nproc = -1
-	} else {
-		data.Nproc = int32(nproc)
 	}
+	machines.Nproc = int32(nproc)
 
 	stor, err := strconv.ParseInt(strings.TrimRight(s[4], "%"), 10, 32)
 	if err != nil {
 		stor = -1
-	} else {
-		data.Storage = int32(stor)
 	}
+	machines.Storage = Measurement{Value: int32(stor)}
 
 	inode, err := strconv.ParseInt(strings.TrimRight(s[5], "%"), 10, 32)
 	if err != nil {
 		inode = -1
-	} else {
-		data.Inode = int32(inode)
 	}
+	machines.Inode = Measurement{Value: int32(inode)}
 
 	ut, err := strconv.ParseFloat(s[6], 10)
 	if err != nil {
 		ut = -1
-	} else {
-		data.Uptime = int64(ut)
 	}
+	machines.Uptime = int64(ut)
 
 	cpu, err := strconv.ParseFloat(s[7], 10)
 	if err != nil {
 		cpu = -1
-	} else {
-		data.CPU = float32(cpu)
 	}
+	machines.CPU = Measurement{Value: float32(cpu)}
 
 }
 
-func setMachineStatus(data *Data) {
+func setMachineStatus(machines *Machine) {
 
-	data.Status = StatusOK
+	machines.Status = StatusOK
 
-	data.Status |= loadStatus(data.Load1, data.Nproc)
-	data.Status |= loadStatus(data.Load5, data.Nproc)
-	data.Status |= loadStatus(data.Load15, data.Nproc)
+	machines.Status |= loadStatus(machines.Load1.Value.(float32), machines.Nproc)
+	machines.Status |= loadStatus(machines.Load5.Value.(float32), machines.Nproc)
+	machines.Status |= loadStatus(machines.Load15.Value.(float32), machines.Nproc)
 
-	if data.CPU >= 90*(float32(data.Nproc)) {
-		data.Status |= StatusError
-	} else if data.CPU >= 80*(float32(data.Nproc)) {
-		data.Status |= StatusWarning
+	cpu := machines.CPU.Value.(float32)
+	if cpu >= 90*(float32(machines.Nproc)) {
+		machines.Status |= StatusError
+	} else if cpu >= 80*(float32(machines.Nproc)) {
+		machines.Status |= StatusWarning
 	}
 
-	if data.Free >= 0.9 {
-		data.Status |= StatusError
-	} else if data.Free >= 0.8 {
-		data.Status |= StatusWarning
+	free := machines.Free.Value.(float32)
+	if free >= 0.9 {
+		machines.Status |= StatusError
+	} else if free >= 0.8 {
+		machines.Status |= StatusWarning
 	}
 
-	if data.Storage >= 90 {
-		data.Status |= StatusError
-	} else if data.Storage >= 80 {
-		data.Status |= StatusWarning
+	storage := machines.Storage.Value.(int32)
+	if storage >= 90 {
+		machines.Status |= StatusError
+	} else if storage >= 80 {
+		machines.Status |= StatusWarning
 	}
 
-	if data.Inode >= 90 {
-		data.Status |= StatusError
-	} else if data.Inode >= 80 {
-		data.Status |= StatusWarning
+	inode := machines.Inode.Value.(int32)
+	if inode >= 90 {
+		machines.Status |= StatusError
+	} else if inode >= 80 {
+		machines.Status |= StatusWarning
 	}
 
-	if data.Connections > 50000 {
-		data.Status |= StatusError
-	} else if data.Connections > 10000 {
-		data.Status |= StatusWarning
+	conns := machines.Connections.Value.(int32)
+	if conns > 50000 {
+		machines.Status |= StatusError
+	} else if conns > 10000 {
+		machines.Status |= StatusWarning
 	}
 
 }
@@ -201,14 +195,14 @@ func loadStatus(load float32, nproc int32) int {
 }
 
 func getPassword() ([]byte, error) {
-	data, err := ioutil.ReadFile(*passFile)
+	machines, err := ioutil.ReadFile(*passFile)
 	if err != nil {
 		return nil, err
 	}
-	if data[len(data)-1] == '\n' {
-		data = data[:len(data)-1]
+	if machines[len(machines)-1] == '\n' {
+		machines = machines[:len(machines)-1]
 	}
-	return data, nil
+	return machines, nil
 }
 
 func populateMachines() error {
@@ -255,10 +249,8 @@ func main() {
 		return
 	}
 	Init(machines)
-	data = make(map[string]*Data)
-	for k, v := range machines {
+	for k, _ := range machines {
 		sorter.keys = append(sorter.keys, k)
-		data[k] = &Data{Machine: k, IP: v.config.Host}
 		formatMachine(k)
 	}
 	sort.Sort(sorter)

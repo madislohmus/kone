@@ -9,29 +9,6 @@ import (
 )
 
 type (
-	Data struct {
-		Machine       string
-		IP            string
-		Load1         float32
-		Load5         float32
-		Load15        float32
-		CPU           float32
-		Free          float32
-		Storage       int32
-		Inode         int32
-		Connections   int32
-		Uptime        int64
-		Nproc         int32
-		Fetching      bool
-		GotResult     bool
-		Status        int
-		FetchingError string
-	}
-
-	Sorter struct {
-		keys []string
-	}
-
 	TextInColumns struct {
 		ColumnWidth     map[string]int
 		ColumnAlignment map[string]Alignment
@@ -48,9 +25,33 @@ type (
 	}
 
 	Machine struct {
-		Name   string
-		config *gosh.Config
-		client *ssh.Client
+		Name          string
+		config        *gosh.Config
+		client        *ssh.Client
+		Load1         Measurement
+		Load5         Measurement
+		Load15        Measurement
+		CPU           Measurement
+		Free          Measurement
+		Storage       Measurement
+		Inode         Measurement
+		Connections   Measurement
+		Uptime        int64
+		Nproc         int32
+		Fetching      bool
+		GotResult     bool
+		Status        int
+		FetchingError string
+	}
+
+	Measurement struct {
+		Value        interface{}
+		WarningLevel interface{}
+		ErrorLevel   interface{}
+	}
+
+	Sorter struct {
+		keys []string
 	}
 )
 
@@ -81,8 +82,8 @@ func (s Sorter) Swap(i, j int) {
 }
 
 func (s Sorter) Less(i, j int) bool {
-	m1 := data[s.keys[i]]
-	m2 := data[s.keys[j]]
+	m1 := machines[s.keys[i]]
+	m2 := machines[s.keys[j]]
 
 	if m1.Status == m2.Status {
 		return sortByName(m1, m2)
@@ -92,11 +93,11 @@ func (s Sorter) Less(i, j int) bool {
 
 }
 
-func sortByName(m1, m2 *Data) bool {
-	return strings.ToLower(m1.Machine) < strings.ToLower(m2.Machine)
+func sortByName(m1, m2 *Machine) bool {
+	return strings.ToLower(m1.Name) < strings.ToLower(m2.Name)
 }
 
-func sortByStatus(m1, m2 *Data) bool {
+func sortByStatus(m1, m2 *Machine) bool {
 	if m1.Status == m2.Status {
 		return sortByName(m1, m2)
 	}
