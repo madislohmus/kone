@@ -145,9 +145,9 @@ func setMachineStatus(machine *Machine) {
 
 	machine.Status = StatusOK
 
-	machine.Status |= getLoad1Status(machine)
-	machine.Status |= getLoad5Status(machine)
-	machine.Status |= getLoad15Status(machine)
+	machine.Status |= getLoadStatus(machine, machine.Load1)
+	machine.Status |= getLoadStatus(machine, machine.Load5)
+	machine.Status |= getLoadStatus(machine, machine.Load15)
 	machine.Status |= getCPUStatus(machine)
 	machine.Status |= getFreeStatus(machine)
 	machine.Status |= getStorageStatus(machine)
@@ -246,58 +246,20 @@ func getConnectionsStatus(machine *Machine) int {
 	return StatusError
 }
 
-func getLoad1Status(machine *Machine) int {
-	load := machine.Load1.Value.(float32)
+func getLoadStatus(machine *Machine, load Measurement) int {
+	l := load.Value.(float32)
 	nproc := machine.Nproc
-	warn, ok := machine.Load1.Warning.(float64)
+	warn, ok := load.Warning.(float64)
 	if !ok {
 		warn = 0.8 * float64(nproc)
 	}
-	err, ok := machine.Load1.Error.(float64)
+	err, ok := load.Error.(float64)
 	if !ok {
 		err = float64(nproc)
 	}
-	if load < float32(warn) {
+	if l < float32(warn) {
 		return StatusOK
-	} else if load < float32(err) {
-		return StatusWarning
-	}
-	return StatusError
-}
-
-func getLoad5Status(machine *Machine) int {
-	load := machine.Load5.Value.(float32)
-	nproc := machine.Nproc
-	warn, ok := machine.Load5.Warning.(float64)
-	if !ok {
-		warn = 0.8 * float64(nproc)
-	}
-	err, ok := machine.Load5.Error.(float64)
-	if !ok {
-		err = float64(nproc)
-	}
-	if load < float32(warn) {
-		return StatusOK
-	} else if load < float32(err) {
-		return StatusWarning
-	}
-	return StatusError
-}
-
-func getLoad15Status(machine *Machine) int {
-	load := machine.Load15.Value.(float32)
-	nproc := machine.Nproc
-	warn, ok := machine.Load15.Warning.(float64)
-	if !ok {
-		warn = 0.8 * float64(nproc)
-	}
-	err, ok := machine.Load15.Error.(float64)
-	if !ok {
-		err = float64(nproc)
-	}
-	if load < float32(warn) {
-		return StatusOK
-	} else if load < float32(err) {
+	} else if l < float32(err) {
 		return StatusWarning
 	}
 	return StatusError
