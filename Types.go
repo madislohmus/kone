@@ -25,19 +25,22 @@ type (
 	}
 
 	Machine struct {
-		Name          string
+		Name          string `json:"name"`
+		User          string `json:"user"`
+		Host          string `json:"host"`
+		Port          string `json:"port"`
 		config        *gosh.Config
 		client        *ssh.Client
-		Load1         Measurement
-		Load5         Measurement
-		Load15        Measurement
-		CPU           Measurement
-		Free          Measurement
-		Storage       Measurement
-		Inode         Measurement
-		Connections   Measurement
-		Uptime        int64
-		Nproc         int32
+		Load1         Measurement `json:"load1"`
+		Load5         Measurement `json:"load5"`
+		Load15        Measurement `json:"load15"`
+		CPU           Measurement `json:"cpu"`
+		Free          Measurement `json:"free"`
+		Storage       Measurement `json:"storage"`
+		Inode         Measurement `json:"inode"`
+		Connections   Measurement `json:"conns"`
+		Uptime        int64       `json:"utime"`
+		Nproc         int32       `json:"nproc"`
 		Fetching      bool
 		GotResult     bool
 		Status        int
@@ -45,9 +48,9 @@ type (
 	}
 
 	Measurement struct {
-		Value        interface{}
-		WarningLevel interface{}
-		ErrorLevel   interface{}
+		Value   interface{}
+		Warning interface{} `json:"warning"`
+		Error   interface{} `json:"error"`
 	}
 
 	Sorter struct {

@@ -1,6 +1,7 @@
 package main
 
 import (
+	"encoding/json"
 	"fmt"
 	"github.com/madislohmus/gosh"
 	"golang.org/x/crypto/ssh"
@@ -82,31 +83,31 @@ func populate(machines *Machine, result string) {
 	if err != nil {
 		l1 = -1
 	}
-	machines.Load1 = Measurement{Value: float32(l1)}
+	machines.Load1.Value = float32(l1)
 
 	l5, err := strconv.ParseFloat(loads[1], 32)
 	if err != nil {
 		l5 = -1
 	}
-	machines.Load5 = Measurement{Value: float32(l5)}
+	machines.Load5.Value = float32(l5)
 
 	l15, err := strconv.ParseFloat(loads[2], 32)
 	if err != nil {
 		l15 = -1
 	}
-	machines.Load15 = Measurement{Value: float32(l15)}
+	machines.Load15.Value = float32(l15)
 
 	free, err := strconv.ParseFloat(s[1], 32)
 	if err != nil {
 		free = -1
 	}
-	machines.Free = Measurement{Value: float32(free)}
+	machines.Free.Value = float32(free)
 
 	conn, err := strconv.ParseInt(s[2], 10, 32)
 	if err != nil {
 		conn = -1
 	}
-	machines.Connections = Measurement{Value: int32(conn)}
+	machines.Connections.Value = int32(conn)
 
 	nproc, err := strconv.ParseInt(s[3], 10, 32)
 	if err != nil {
@@ -118,13 +119,13 @@ func populate(machines *Machine, result string) {
 	if err != nil {
 		stor = -1
 	}
-	machines.Storage = Measurement{Value: int32(stor)}
+	machines.Storage.Value = int32(stor)
 
 	inode, err := strconv.ParseInt(strings.TrimRight(s[5], "%"), 10, 32)
 	if err != nil {
 		inode = -1
 	}
-	machines.Inode = Measurement{Value: int32(inode)}
+	machines.Inode.Value = int32(inode)
 
 	ut, err := strconv.ParseFloat(s[6], 10)
 	if err != nil {
@@ -136,59 +137,128 @@ func populate(machines *Machine, result string) {
 	if err != nil {
 		cpu = -1
 	}
-	machines.CPU = Measurement{Value: float32(cpu)}
+	machines.CPU.Value = float32(cpu)
 
 }
 
-func setMachineStatus(machines *Machine) {
+func setMachineStatus(machine *Machine) {
 
-	machines.Status = StatusOK
+	machine.Status = StatusOK
 
-	machines.Status |= loadStatus(machines.Load1.Value.(float32), machines.Nproc)
-	machines.Status |= loadStatus(machines.Load5.Value.(float32), machines.Nproc)
-	machines.Status |= loadStatus(machines.Load15.Value.(float32), machines.Nproc)
-
-	cpu := machines.CPU.Value.(float32)
-	if cpu >= 90*(float32(machines.Nproc)) {
-		machines.Status |= StatusError
-	} else if cpu >= 80*(float32(machines.Nproc)) {
-		machines.Status |= StatusWarning
-	}
-
-	free := machines.Free.Value.(float32)
-	if free >= 0.9 {
-		machines.Status |= StatusError
-	} else if free >= 0.8 {
-		machines.Status |= StatusWarning
-	}
-
-	storage := machines.Storage.Value.(int32)
-	if storage >= 90 {
-		machines.Status |= StatusError
-	} else if storage >= 80 {
-		machines.Status |= StatusWarning
-	}
-
-	inode := machines.Inode.Value.(int32)
-	if inode >= 90 {
-		machines.Status |= StatusError
-	} else if inode >= 80 {
-		machines.Status |= StatusWarning
-	}
-
-	conns := machines.Connections.Value.(int32)
-	if conns > 50000 {
-		machines.Status |= StatusError
-	} else if conns > 10000 {
-		machines.Status |= StatusWarning
-	}
+	machine.Status |= getLoadStatus(machine, machine.Load1.Value.(float32))
+	machine.Status |= getLoadStatus(machine, machine.Load5.Value.(float32))
+	machine.Status |= getLoadStatus(machine, machine.Load15.Value.(float32))
+	machine.Status |= getCPUStatus(machine)
+	machine.Status |= getFreeStatus(machine)
+	machine.Status |= getStorageStatus(machine)
+	machine.Status |= getInodeStatus(machine)
+	machine.Status |= getConnectionsStatus(machine)
 
 }
 
-func loadStatus(load float32, nproc int32) int {
-	if load < float32(nproc)*0.8 {
+func getCPUStatus(machine *Machine) int {
+	cpu := machine.CPU.Value.(float32)
+	warn, ok := machine.CPU.Warning.(float64)
+	if !ok {
+		warn = 90
+	}
+	err, ok := machine.CPU.Warning.(float64)
+	if !ok {
+		err = 80
+	}
+	if cpu < float32(warn)*(float32(machine.Nproc)) {
 		return StatusOK
-	} else if load < float32(nproc) {
+	} else if cpu < float32(err)*(float32(machine.Nproc)) {
+		return StatusWarning
+	}
+	return StatusError
+}
+
+func getFreeStatus(machine *Machine) int {
+	free := machine.Free.Value.(float32)
+	warn, ok := machine.Free.Warning.(float64)
+	if !ok {
+		warn = 0.8
+	}
+	err, ok := machine.Free.Warning.(float64)
+	if !ok {
+		err = 0.9
+	}
+	if free < float32(warn) {
+		return StatusOK
+	} else if free < float32(err) {
+		return StatusWarning
+	}
+	return StatusError
+}
+
+func getStorageStatus(machine *Machine) int {
+	storage := machine.Storage.Value.(int32)
+	warn, ok := machine.Storage.Warning.(float64)
+	if !ok {
+		warn = 80
+	}
+	err, ok := machine.Storage.Warning.(float64)
+	if !ok {
+		err = 90
+	}
+	if storage < int32(warn) {
+		return StatusOK
+	} else if storage < int32(err) {
+		return StatusWarning
+	}
+	return StatusError
+}
+
+func getInodeStatus(machine *Machine) int {
+	inode := machine.Inode.Value.(int32)
+	warn, ok := machine.Inode.Warning.(float64)
+	if !ok {
+		warn = 80
+	}
+	err, ok := machine.Inode.Warning.(float64)
+	if !ok {
+		err = 90
+	}
+	if inode < int32(warn) {
+		return StatusOK
+	} else if inode < int32(err) {
+		return StatusWarning
+	}
+	return StatusError
+}
+
+func getConnectionsStatus(machine *Machine) int {
+	conns := machine.Connections.Value.(int32)
+	warn, ok := machine.Connections.Warning.(float64)
+	if !ok {
+		warn = 10000
+	}
+	err, ok := machine.Connections.Warning.(float64)
+	if !ok {
+		err = 50000
+	}
+	if conns < int32(warn) {
+		return StatusOK
+	} else if conns < int32(err) {
+		return StatusWarning
+	}
+	return StatusError
+}
+
+func getLoadStatus(machine *Machine, load float32) int {
+	nproc := machine.Nproc
+	warn, ok := machine.Connections.Warning.(float64)
+	if !ok {
+		warn = 0.8 * float64(nproc)
+	}
+	err, ok := machine.Connections.Warning.(float64)
+	if !ok {
+		err = float64(nproc)
+	}
+	if load < float32(warn) {
+		return StatusOK
+	} else if load < float32(err) {
 		return StatusWarning
 	}
 	return StatusError
@@ -211,19 +281,20 @@ func populateMachines() error {
 		return err
 	}
 	machines = make(map[string]*Machine)
-	for _, line := range strings.Split(string(data), "\n") {
-		m := strings.Split(line, ",")
-		if len(m) > 3 {
-			config := gosh.Config{
-				User:    strings.TrimSpace(m[1]),
-				Host:    strings.TrimSpace(m[2]),
-				Port:    strings.TrimSpace(m[3]),
-				Timeout: 15 * time.Second,
-				Signer:  signer}
-			machines[strings.TrimSpace(m[0])] = &Machine{
-				Name:   strings.TrimSpace(m[0]),
-				config: &config}
-		}
+	var ms []*Machine
+	err = json.Unmarshal(data, &ms)
+	if err != nil {
+		return err
+	}
+	for _, m := range ms {
+		config := gosh.Config{
+			User:    m.User,
+			Host:    m.Host,
+			Port:    m.Port,
+			Timeout: 15 * time.Second,
+			Signer:  signer}
+		m.config = &config
+		machines[m.Name] = m
 	}
 	return nil
 }

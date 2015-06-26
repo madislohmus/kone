@@ -200,14 +200,15 @@ func formatLoad(load Measurement, d *Machine) *StyledText {
 func formatCPU(d *Machine) {
 	s := newStyledText()
 	cpu := d.CPU.Value.(float32)
-	if silent && cpu < float32(80*d.Nproc) {
+	status := getCPUStatus(d)
+	if silent && (status == StatusOK) {
 		appendSilent(&s)
 	} else {
 		for _, r := range fmt.Sprintf("%.1f", cpu) {
 			s.Runes = append(s.Runes, r)
-			if cpu < float32(80*d.Nproc) {
+			if status == StatusOK {
 				s.FG = append(s.FG, 3)
-			} else if cpu < float32(90*d.Nproc) {
+			} else if status == StatusWarning {
 				s.FG = append(s.FG, 4|termbox.AttrBold)
 			} else {
 				s.FG = append(s.FG, 2|termbox.AttrBold)
@@ -226,14 +227,15 @@ func formatCPU(d *Machine) {
 func formatFree(d *Machine) {
 	s := newStyledText()
 	free := d.Free.Value.(float32)
-	if silent && free < 0.8 {
+	status := getFreeStatus(d)
+	if silent && (status == StatusOK) {
 		appendSilent(&s)
 	} else {
 		for _, r := range fmt.Sprintf("%.2f", free) {
 			s.Runes = append(s.Runes, r)
-			if free < 0.8 {
+			if status == StatusOK {
 				s.FG = append(s.FG, 3)
-			} else if free < 0.9 {
+			} else if status == StatusWarning {
 				s.FG = append(s.FG, 4|termbox.AttrBold)
 			} else {
 				s.FG = append(s.FG, 2|termbox.AttrBold)
@@ -247,14 +249,15 @@ func formatFree(d *Machine) {
 func formatStorage(d *Machine) {
 	s := newStyledText()
 	storage := d.Storage.Value.(int32)
-	if silent && storage < 80 {
+	status := getStorageStatus(d)
+	if silent && (status == StatusOK) {
 		appendSilent(&s)
 	} else {
 		for _, r := range fmt.Sprintf("%3d", storage) {
 			s.Runes = append(s.Runes, r)
-			if storage < 80 {
+			if status == StatusOK {
 				s.FG = append(s.FG, 3)
-			} else if storage < 90 {
+			} else if status == StatusWarning {
 				s.FG = append(s.FG, 4|termbox.AttrBold)
 			} else {
 				s.FG = append(s.FG, 2|termbox.AttrBold)
@@ -268,14 +271,15 @@ func formatStorage(d *Machine) {
 func formatInode(d *Machine) {
 	s := newStyledText()
 	inode := d.Inode.Value.(int32)
-	if silent && inode < 80 {
+	status := getInodeStatus(d)
+	if silent && (status == StatusOK) {
 		appendSilent(&s)
 	} else {
 		for _, r := range fmt.Sprintf("%3d", inode) {
 			s.Runes = append(s.Runes, r)
-			if inode < 80 {
+			if status == StatusOK {
 				s.FG = append(s.FG, 3)
-			} else if inode < 90 {
+			} else if status == StatusWarning {
 				s.FG = append(s.FG, 4|termbox.AttrBold)
 			} else {
 				s.FG = append(s.FG, 2|termbox.AttrBold)
@@ -289,14 +293,15 @@ func formatInode(d *Machine) {
 func formatCons(d *Machine) {
 	s := newStyledText()
 	conns := d.Connections.Value.(int32)
-	if silent && conns < 10000 {
+	status := getConnectionsStatus(d)
+	if silent && (status == StatusOK) {
 		appendSilent(&s)
 	} else {
 		for _, r := range fmt.Sprintf("%d", conns) {
 			s.Runes = append(s.Runes, r)
-			if conns < 10000 {
+			if status == StatusOK {
 				s.FG = append(s.FG, 3)
-			} else if conns < 50000 {
+			} else if status == StatusWarning {
 				s.FG = append(s.FG, 4|termbox.AttrBold)
 			} else {
 				s.FG = append(s.FG, 2|termbox.AttrBold)
