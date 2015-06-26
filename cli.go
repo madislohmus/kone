@@ -179,20 +179,11 @@ func formatLoads(d *Machine) {
 func formatLoad(load Measurement, d *Machine) *StyledText {
 	s := newStyledText()
 	lv := load.Value.(float32)
-	if silent && lv < float32(d.Nproc)*0.8 {
+	status := getLoadStatus(d, load)
+	if silent && (status == StatusOK) {
 		appendSilent(&s)
 	} else {
-		for _, r := range fmt.Sprintf("%.2f", lv) {
-			s.Runes = append(s.Runes, r)
-			if lv < float32(d.Nproc)*0.8 {
-				s.FG = append(s.FG, 3)
-			} else if lv < float32(d.Nproc) {
-				s.FG = append(s.FG, 4|termbox.AttrBold)
-			} else {
-				s.FG = append(s.FG, 2|termbox.AttrBold)
-			}
-			s.BG = append(s.BG, termbox.ColorDefault)
-		}
+		formatText(fmt.Sprintf("%.2f", lv), status, &s)
 	}
 	return &s
 }
