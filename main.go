@@ -145,9 +145,9 @@ func setMachineStatus(machine *Machine) {
 
 	machine.Status = StatusOK
 
-	machine.Status |= getLoadStatus(machine, machine.Load1.Value.(float32))
-	machine.Status |= getLoadStatus(machine, machine.Load5.Value.(float32))
-	machine.Status |= getLoadStatus(machine, machine.Load15.Value.(float32))
+	machine.Status |= getLoad1Status(machine)
+	machine.Status |= getLoad5Status(machine)
+	machine.Status |= getLoad15Status(machine)
 	machine.Status |= getCPUStatus(machine)
 	machine.Status |= getFreeStatus(machine)
 	machine.Status |= getStorageStatus(machine)
@@ -162,7 +162,7 @@ func getCPUStatus(machine *Machine) int {
 	if !ok {
 		warn = 90
 	}
-	err, ok := machine.CPU.Warning.(float64)
+	err, ok := machine.CPU.Error.(float64)
 	if !ok {
 		err = 80
 	}
@@ -180,7 +180,7 @@ func getFreeStatus(machine *Machine) int {
 	if !ok {
 		warn = 0.8
 	}
-	err, ok := machine.Free.Warning.(float64)
+	err, ok := machine.Free.Error.(float64)
 	if !ok {
 		err = 0.9
 	}
@@ -198,7 +198,7 @@ func getStorageStatus(machine *Machine) int {
 	if !ok {
 		warn = 80
 	}
-	err, ok := machine.Storage.Warning.(float64)
+	err, ok := machine.Storage.Error.(float64)
 	if !ok {
 		err = 90
 	}
@@ -216,7 +216,7 @@ func getInodeStatus(machine *Machine) int {
 	if !ok {
 		warn = 80
 	}
-	err, ok := machine.Inode.Warning.(float64)
+	err, ok := machine.Inode.Error.(float64)
 	if !ok {
 		err = 90
 	}
@@ -234,7 +234,7 @@ func getConnectionsStatus(machine *Machine) int {
 	if !ok {
 		warn = 10000
 	}
-	err, ok := machine.Connections.Warning.(float64)
+	err, ok := machine.Connections.Error.(float64)
 	if !ok {
 		err = 50000
 	}
@@ -246,13 +246,52 @@ func getConnectionsStatus(machine *Machine) int {
 	return StatusError
 }
 
-func getLoadStatus(machine *Machine, load float32) int {
+func getLoad1Status(machine *Machine) int {
+	load := machine.Load1.Value.(float32)
 	nproc := machine.Nproc
-	warn, ok := machine.Connections.Warning.(float64)
+	warn, ok := machine.Load1.Warning.(float64)
 	if !ok {
 		warn = 0.8 * float64(nproc)
 	}
-	err, ok := machine.Connections.Warning.(float64)
+	err, ok := machine.Load1.Error.(float64)
+	if !ok {
+		err = float64(nproc)
+	}
+	if load < float32(warn) {
+		return StatusOK
+	} else if load < float32(err) {
+		return StatusWarning
+	}
+	return StatusError
+}
+
+func getLoad5Status(machine *Machine) int {
+	load := machine.Load5.Value.(float32)
+	nproc := machine.Nproc
+	warn, ok := machine.Load5.Warning.(float64)
+	if !ok {
+		warn = 0.8 * float64(nproc)
+	}
+	err, ok := machine.Load5.Error.(float64)
+	if !ok {
+		err = float64(nproc)
+	}
+	if load < float32(warn) {
+		return StatusOK
+	} else if load < float32(err) {
+		return StatusWarning
+	}
+	return StatusError
+}
+
+func getLoad15Status(machine *Machine) int {
+	load := machine.Load15.Value.(float32)
+	nproc := machine.Nproc
+	warn, ok := machine.Load15.Warning.(float64)
+	if !ok {
+		warn = 0.8 * float64(nproc)
+	}
+	err, ok := machine.Load15.Error.(float64)
 	if !ok {
 		err = float64(nproc)
 	}

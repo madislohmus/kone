@@ -204,17 +204,7 @@ func formatCPU(d *Machine) {
 	if silent && (status == StatusOK) {
 		appendSilent(&s)
 	} else {
-		for _, r := range fmt.Sprintf("%.1f", cpu) {
-			s.Runes = append(s.Runes, r)
-			if status == StatusOK {
-				s.FG = append(s.FG, 3)
-			} else if status == StatusWarning {
-				s.FG = append(s.FG, 4|termbox.AttrBold)
-			} else {
-				s.FG = append(s.FG, 2|termbox.AttrBold)
-			}
-			s.BG = append(s.BG, termbox.ColorDefault)
-		}
+		formatText(fmt.Sprintf("%.1f", cpu), status, &s)
 		for _, r := range fmt.Sprintf(":%d", d.Nproc) {
 			s.Runes = append(s.Runes, r)
 			s.FG = append(s.FG, 9)
@@ -231,17 +221,7 @@ func formatFree(d *Machine) {
 	if silent && (status == StatusOK) {
 		appendSilent(&s)
 	} else {
-		for _, r := range fmt.Sprintf("%.2f", free) {
-			s.Runes = append(s.Runes, r)
-			if status == StatusOK {
-				s.FG = append(s.FG, 3)
-			} else if status == StatusWarning {
-				s.FG = append(s.FG, 4|termbox.AttrBold)
-			} else {
-				s.FG = append(s.FG, 2|termbox.AttrBold)
-			}
-			s.BG = append(s.BG, termbox.ColorDefault)
-		}
+		formatText(fmt.Sprintf("%.2f", free), status, &s)
 	}
 	rowToHeader(&s, d.Name, hFree)
 }
@@ -253,17 +233,7 @@ func formatStorage(d *Machine) {
 	if silent && (status == StatusOK) {
 		appendSilent(&s)
 	} else {
-		for _, r := range fmt.Sprintf("%3d", storage) {
-			s.Runes = append(s.Runes, r)
-			if status == StatusOK {
-				s.FG = append(s.FG, 3)
-			} else if status == StatusWarning {
-				s.FG = append(s.FG, 4|termbox.AttrBold)
-			} else {
-				s.FG = append(s.FG, 2|termbox.AttrBold)
-			}
-			s.BG = append(s.BG, termbox.ColorDefault)
-		}
+		formatText(fmt.Sprintf("%3d", storage), status, &s)
 	}
 	rowToHeader(&s, d.Name, hStorage)
 }
@@ -275,17 +245,7 @@ func formatInode(d *Machine) {
 	if silent && (status == StatusOK) {
 		appendSilent(&s)
 	} else {
-		for _, r := range fmt.Sprintf("%3d", inode) {
-			s.Runes = append(s.Runes, r)
-			if status == StatusOK {
-				s.FG = append(s.FG, 3)
-			} else if status == StatusWarning {
-				s.FG = append(s.FG, 4|termbox.AttrBold)
-			} else {
-				s.FG = append(s.FG, 2|termbox.AttrBold)
-			}
-			s.BG = append(s.BG, termbox.ColorDefault)
-		}
+		formatText(fmt.Sprintf("%3d", inode), status, &s)
 	}
 	rowToHeader(&s, d.Name, hInode)
 }
@@ -297,19 +257,23 @@ func formatCons(d *Machine) {
 	if silent && (status == StatusOK) {
 		appendSilent(&s)
 	} else {
-		for _, r := range fmt.Sprintf("%d", conns) {
-			s.Runes = append(s.Runes, r)
-			if status == StatusOK {
-				s.FG = append(s.FG, 3)
-			} else if status == StatusWarning {
-				s.FG = append(s.FG, 4|termbox.AttrBold)
-			} else {
-				s.FG = append(s.FG, 2|termbox.AttrBold)
-			}
-			s.BG = append(s.BG, termbox.ColorDefault)
-		}
+		formatText(fmt.Sprintf("%d", conns), status, &s)
 	}
 	rowToHeader(&s, d.Name, hCons)
+}
+
+func formatText(text string, status int, s *StyledText) {
+	for _, r := range text {
+		s.Runes = append(s.Runes, r)
+		if status == StatusOK {
+			s.FG = append(s.FG, 3)
+		} else if status == StatusWarning {
+			s.FG = append(s.FG, 4|termbox.AttrBold)
+		} else {
+			s.FG = append(s.FG, 2|termbox.AttrBold)
+		}
+		s.BG = append(s.BG, termbox.ColorDefault)
+	}
 }
 
 func formatUptime(d *Machine) {
