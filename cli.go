@@ -5,6 +5,7 @@ import (
 	"github.com/nsf/termbox-go"
 	"math"
 	"os/exec"
+	"strings"
 	"sync"
 	"time"
 )
@@ -33,11 +34,13 @@ var (
 	silent         bool
 	showIPs        bool
 	forceReConnect bool
+	search         bool
 
 	selectedBg = termbox.ColorBlack | termbox.AttrBold
 	selectedFg = termbox.ColorWhite | termbox.AttrBold
 
-	mutex sync.Mutex
+	mutex        sync.Mutex
+	searchString string
 )
 
 func newStyledText() StyledText {
@@ -80,6 +83,7 @@ func redraw() {
 	adjustStartPosition()
 	drawDate()
 	drawHeader()
+	drawStatusBar()
 	for i, _ := range sorter.keys {
 		drawAtIndex(i, false)
 	}
@@ -148,7 +152,8 @@ func formatName(d *Machine) {
 	if showIPs {
 		name = d.config.Host
 	}
-	for _, r := range name {
+	idx := strings.Index(strings.ToLower(name), strings.ToLower(searchString))
+	for i, r := range name {
 		s.Runes = append(s.Runes, r)
 		if d.GotResult {
 			if d.Status&StatusError > 0 {
@@ -165,7 +170,11 @@ func formatName(d *Machine) {
 		} else {
 			s.FG = append(s.FG, 9)
 		}
-		s.BG = append(s.BG, termbox.ColorDefault)
+		if search && len(searchString) > 0 && idx > -1 && i >= idx && i < idx+len(searchString) {
+			s.BG = append(s.BG, termbox.ColorYellow)
+		} else {
+			s.BG = append(s.BG, termbox.ColorDefault)
+		}
 	}
 	rowToHeader(&s, d.Name, hMachine)
 }
@@ -314,6 +323,20 @@ func drawDate() {
 	}
 }
 
+func drawStatusBar() {
+	w, h := termbox.Size()
+	if search {
+		for i, r := range fmt.Sprintf("search: %s", searchString) {
+			termbox.SetCell(i+1, h-1, r, 2, termbox.ColorDefault)
+		}
+	}
+	if forceReConnect {
+		for i, r := range "[F]" {
+			termbox.SetCell(w-4+i, h-1, r, 2, termbox.ColorDefault)
+		}
+	}
+}
+
 func formatDuration(duration int64) string {
 	h := int64(math.Floor(float64(duration / 3600.0)))
 	m := int64(math.Floor(float64(float64(duration)-float64(3600*h)) / 60.0))
@@ -330,7 +353,7 @@ func formatDuration(duration int64) string {
 
 func drawAtIndex(i int, flush bool) {
 	w, h := termbox.Size()
-	if i < startPosition || i > startPosition+h-dataStartRow {
+	if i < startPosition || i > startPosition+h-2-dataStartRow {
 		return
 	}
 	name := sorter.keys[i]
@@ -398,7 +421,7 @@ func adjustStartPosition() {
 	if h > (len(tic.Data) + dataStartRow) {
 		startPosition = 0
 	} else {
-		if startPosition+h-dataStartRow > len(tic.Data) {
+		if startPosition+h-1-dataStartRow > len(tic.Data) {
 			startPosition = len(tic.Data) - (h - dataStartRow)
 		}
 	}
@@ -429,10 +452,10 @@ loop:
 						drawDate()
 						RunOnHosts(forceReConnect)
 					}(forceReConnect)
-					forceReConnect = false
 				}
 			case termbox.KeyCtrlF:
-				forceReConnect = true
+				search = true
+				redraw()
 			case termbox.KeyArrowUp:
 				if cursorPosition > 0 {
 					if cursorPosition == startPosition {
@@ -447,8 +470,8 @@ loop:
 				_, h := termbox.Size()
 				if cursorPosition < len(tic.Data)-1 {
 					cursorPosition++
-					if cursorPosition == startPosition+(h-dataStartRow) {
-						if startPosition < len(tic.Data) {
+					if cursorPosition == startPosition+(h-1-dataStartRow) {
+						if startPosition < len(tic.Data)-2 {
 							startPosition++
 						}
 					}
@@ -459,7 +482,7 @@ loop:
 			case termbox.KeyEnd:
 				_, h := termbox.Size()
 				cursorPosition = len(tic.Data) - 1
-				startPosition = len(tic.Data) - (h - dataStartRow)
+				startPosition = len(tic.Data) - (h - 1 - dataStartRow)
 				redraw()
 			case termbox.KeyHome:
 				cursorPosition = 0
@@ -467,7 +490,7 @@ loop:
 				redraw()
 			case termbox.KeyPgdn:
 				_, h := termbox.Size()
-				pageSize := h - dataStartRow
+				pageSize := h - 1 - dataStartRow
 				dataLength := len(tic.Data)
 				if cursorPosition+pageSize < dataLength {
 					cursorPosition += pageSize
@@ -495,26 +518,49 @@ loop:
 					}
 				}
 				redraw()
+			case termbox.KeyBackspace2:
+				if search && len(searchString) > 0 {
+					searchString = searchString[0 : len(searchString)-1]
+					formatAll()
+					redraw()
+				}
 			case termbox.KeyEsc:
-				break loop
+				if search {
+					search = false
+					searchString = ""
+					formatAll()
+					redraw()
+				} else {
+					break loop
+				}
 			}
-			switch ev.Ch {
-			case 115: // s
-				silent = !silent
-				formatAll()
-				redraw()
-			case 105: // i
-				showIPs = !showIPs
-				formatAll()
-				redraw()
-			case 114: // r
-				if !machines[sorter.keys[cursorPosition]].Fetching {
-					go func(forceReConnect bool) {
-						fetchTime = time.Now()
-						drawDate()
-						RunOnHost(machines[sorter.keys[cursorPosition]].Name, forceReConnect)
-					}(forceReConnect)
-					forceReConnect = false
+			if search {
+				if ev.Ch > 31 && ev.Ch < 127 && len(searchString) < 50 {
+					searchString += string(ev.Ch)
+					formatAll()
+					redraw()
+				}
+			} else {
+				switch ev.Ch {
+				case 102:
+					forceReConnect = !forceReConnect
+					redraw()
+				case 115: // s
+					silent = !silent
+					formatAll()
+					redraw()
+				case 105: // i
+					showIPs = !showIPs
+					formatAll()
+					redraw()
+				case 114: // r
+					if !machines[sorter.keys[cursorPosition]].Fetching {
+						go func(forceReConnect bool) {
+							fetchTime = time.Now()
+							drawDate()
+							RunOnHost(machines[sorter.keys[cursorPosition]].Name, forceReConnect)
+						}(forceReConnect)
+					}
 				}
 			}
 		case termbox.EventResize:
