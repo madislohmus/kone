@@ -321,6 +321,7 @@ func main() {
 		return
 	}
 	Init(machines)
+	sorter = Sorter{keyToIndex: make(map[string]int)}
 	for k, _ := range machines {
 		sorter.keys = append(sorter.keys, k)
 		formatMachine(k)

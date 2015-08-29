@@ -54,7 +54,8 @@ type (
 	}
 
 	Sorter struct {
-		keys []string
+		keys       []string
+		keyToIndex map[string]int
 	}
 )
 
@@ -82,6 +83,8 @@ func (s Sorter) Len() int {
 
 func (s Sorter) Swap(i, j int) {
 	s.keys[i], s.keys[j] = s.keys[j], s.keys[i]
+	s.keyToIndex[s.keys[i]] = i
+	s.keyToIndex[s.keys[j]] = j
 }
 
 func (s Sorter) Less(i, j int) bool {

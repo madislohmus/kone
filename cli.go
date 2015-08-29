@@ -25,11 +25,13 @@ var (
 	hCons         = "conns"
 	hUptime       = "uptime"
 
-	headerRow      = 3
-	dateRow        = 1
-	dataStartRow   = 4
-	startPosition  = 0
-	cursorPosition = 0
+	headerRow        = 3
+	dateRow          = 1
+	dataStartRow     = 4
+	startPosition    = 0
+	cursorPosition   = 0
+	matchingCount    = 0
+	matchingMachines = make(map[string]bool)
 
 	silent         bool
 	showIPs        bool
@@ -75,6 +77,7 @@ func Init(m map[string]*Machine) {
 		if len(k) > tic.ColumnWidth[hMachine] {
 			tic.ColumnWidth[hMachine] = len(k)
 		}
+		matchingMachines[k] = false
 	}
 }
 
@@ -84,8 +87,18 @@ func redraw() {
 	drawDate()
 	drawHeader()
 	drawStatusBar()
-	for i, _ := range sorter.keys {
-		drawAtIndex(i, false)
+	if search && len(searchString) > 0 {
+		i := 0
+		for _, k := range sorter.keys {
+			if matchingMachines[k] {
+				drawAtIndex(i, k, false)
+				i += 1
+			}
+		}
+	} else {
+		for i, k := range sorter.keys {
+			drawAtIndex(i, k, false)
+		}
 	}
 	mutex.Lock()
 	termbox.Flush()
@@ -93,6 +106,7 @@ func redraw() {
 }
 
 func formatAll() {
+	matchingCount = 0
 	for _, k := range sorter.keys {
 		formatMachine(k)
 	}
@@ -152,7 +166,12 @@ func formatName(d *Machine) {
 	if showIPs {
 		name = d.config.Host
 	}
+	matchingMachines[d.Name] = false
 	idx := strings.Index(strings.ToLower(name), strings.ToLower(searchString))
+	if idx > -1 {
+		matchingMachines[d.Name] = true
+		matchingCount += 1
+	}
 	for i, r := range name {
 		s.Runes = append(s.Runes, r)
 		if d.GotResult {
@@ -351,12 +370,11 @@ func formatDuration(duration int64) string {
 	return fmt.Sprintf("%s%s%02d", hs, ms, s)
 }
 
-func drawAtIndex(i int, flush bool) {
+func drawAtIndex(i int, name string, flush bool) {
 	w, h := termbox.Size()
 	if i < startPosition || i > startPosition+h-2-dataStartRow {
 		return
 	}
-	name := sorter.keys[i]
 	row := i - startPosition + dataStartRow
 	bg := termbox.ColorDefault
 	var indexFg termbox.Attribute
@@ -391,7 +409,9 @@ func drawAtIndex(i int, flush bool) {
 			bg := s.BG[j]
 			if selected {
 				fg = selectedFg
-				bg = selectedBg
+				if bg == termbox.ColorDefault {
+					bg = selectedBg
+				}
 			}
 			termbox.SetCell(position+j, row, s.Runes[j], fg, bg)
 		}
@@ -428,8 +448,20 @@ func adjustStartPosition() {
 }
 
 func openConsole() {
-	name := machines[sorter.keys[cursorPosition]].Name
-	user := machines[sorter.keys[cursorPosition]].config.User
+	key := sorter.keys[cursorPosition]
+	if search {
+		i := 0
+		for _, k := range sorter.keys {
+			if matchingMachines[k] {
+				if i == cursorPosition {
+					key = k
+				}
+				i += 1
+			}
+		}
+	}
+	name := machines[key].Name
+	user := machines[key].config.User
 	cmd := exec.Command("urxvt", "-e", "ssh", fmt.Sprintf("%s@%s", user, name))
 	go func() {
 		err := cmd.Run()
@@ -468,7 +500,11 @@ loop:
 				}
 			case termbox.KeyArrowDown:
 				_, h := termbox.Size()
-				if cursorPosition < len(tic.Data)-1 {
+				limit := len(tic.Data)
+				if search {
+					limit = matchingCount
+				}
+				if cursorPosition < limit-1 {
 					cursorPosition++
 					if cursorPosition == startPosition+(h-1-dataStartRow) {
 						if startPosition < len(tic.Data)-2 {
@@ -481,8 +517,16 @@ loop:
 				openConsole()
 			case termbox.KeyEnd:
 				_, h := termbox.Size()
-				cursorPosition = len(tic.Data) - 1
-				startPosition = len(tic.Data) - (h - 1 - dataStartRow)
+				limit := len(tic.Data)
+				if search {
+					limit = matchingCount
+				}
+				cursorPosition = limit - 1
+				if limit < h-1-dataStartRow {
+					startPosition = 0
+				} else {
+					startPosition = limit - (h - 1 - dataStartRow)
+				}
 				redraw()
 			case termbox.KeyHome:
 				cursorPosition = 0
@@ -492,12 +536,17 @@ loop:
 				_, h := termbox.Size()
 				pageSize := h - 1 - dataStartRow
 				dataLength := len(tic.Data)
+				if search {
+					dataLength = matchingCount
+				}
 				if cursorPosition+pageSize < dataLength {
 					cursorPosition += pageSize
 				} else {
 					cursorPosition = dataLength - 1
 				}
-				if startPosition+pageSize < dataLength-pageSize {
+				if dataLength < pageSize {
+					startPosition = 0
+				} else if startPosition+pageSize < dataLength-pageSize {
 					startPosition += pageSize
 				} else {
 					startPosition = dataLength - pageSize
@@ -505,7 +554,7 @@ loop:
 				redraw()
 			case termbox.KeyPgup:
 				_, h := termbox.Size()
-				pageSize := h - dataStartRow
+				pageSize := h - 1 - dataStartRow
 				if cursorPosition-pageSize < 0 {
 					cursorPosition = 0
 					startPosition = 0
@@ -519,11 +568,16 @@ loop:
 				}
 				redraw()
 			case termbox.KeyBackspace2:
-				if search && len(searchString) > 0 {
-					searchString = searchString[0 : len(searchString)-1]
-					formatAll()
-					redraw()
+				if search {
+					if len(searchString) > 0 {
+						searchString = searchString[0 : len(searchString)-1]
+					} else {
+						search = false
+						searchString = ""
+					}
 				}
+				formatAll()
+				redraw()
 			case termbox.KeyEsc:
 				if search {
 					search = false
@@ -537,12 +591,13 @@ loop:
 			if search {
 				if ev.Ch > 31 && ev.Ch < 127 && len(searchString) < 50 {
 					searchString += string(ev.Ch)
+					cursorPosition = 0
 					formatAll()
 					redraw()
 				}
 			} else {
 				switch ev.Ch {
-				case 102:
+				case 102: // f
 					forceReConnect = !forceReConnect
 					redraw()
 				case 115: // s
