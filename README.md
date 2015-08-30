@@ -43,6 +43,7 @@ Keys:
 * `ctrl + r` -  reload status info for all machines
 * `ctrl + f` - search (machine name / IP)
 * `Enter` - open shell to selected machine
+* `Esc` - exit search / program
 
 ## Screenshot
 ![Screenshot](/../screenshot/output.gif?raw=true "Screenshot")
