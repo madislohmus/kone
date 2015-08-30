@@ -349,6 +349,16 @@ func drawStatusBar() {
 			termbox.SetCell(i+1, h-1, r, 2, termbox.ColorDefault)
 		}
 	}
+	if showIPs {
+		for i, r := range "[IP]" {
+			termbox.SetCell(w-13+i, h-1, r, 2, termbox.ColorDefault)
+		}
+	}
+	if silent {
+		for i, r := range "[S]" {
+			termbox.SetCell(w-8+i, h-1, r, 2, termbox.ColorDefault)
+		}
+	}
 	if forceReConnect {
 		for i, r := range "[F]" {
 			termbox.SetCell(w-4+i, h-1, r, 2, termbox.ColorDefault)
@@ -471,6 +481,121 @@ func openConsole() {
 	}()
 }
 
+func handleArrowUp() {
+	if cursorPosition > 0 {
+		if cursorPosition == startPosition {
+			if startPosition > 0 {
+				startPosition--
+			}
+		}
+		cursorPosition--
+		redraw()
+	}
+}
+
+func handleArrowDown() {
+	_, h := termbox.Size()
+	limit := len(tic.Data)
+	if search {
+		limit = matchingCount
+	}
+	if cursorPosition < limit-1 {
+		cursorPosition++
+		if cursorPosition == startPosition+(h-1-dataStartRow) {
+			if startPosition < len(tic.Data)-2 {
+				startPosition++
+			}
+		}
+		redraw()
+	}
+}
+
+func handleKeyEnd() {
+	_, h := termbox.Size()
+	limit := len(tic.Data)
+	if search {
+		limit = matchingCount
+	}
+	cursorPosition = limit - 1
+	if limit < h-1-dataStartRow {
+		startPosition = 0
+	} else {
+		startPosition = limit - (h - 1 - dataStartRow)
+	}
+	redraw()
+}
+
+func handlePageDown() {
+	_, h := termbox.Size()
+	pageSize := h - 1 - dataStartRow
+	dataLength := len(tic.Data)
+	if search {
+		dataLength = matchingCount
+	}
+	if cursorPosition+pageSize < dataLength {
+		cursorPosition += pageSize
+	} else {
+		cursorPosition = dataLength - 1
+	}
+	if dataLength < pageSize {
+		startPosition = 0
+	} else if startPosition+pageSize < dataLength-pageSize {
+		startPosition += pageSize
+	} else {
+		startPosition = dataLength - pageSize
+	}
+	redraw()
+}
+
+func handlePageUp() {
+	_, h := termbox.Size()
+	pageSize := h - 1 - dataStartRow
+	if cursorPosition-pageSize < 0 {
+		cursorPosition = 0
+		startPosition = 0
+	} else {
+		cursorPosition -= pageSize
+		if cursorPosition < pageSize {
+			startPosition = 0
+		} else {
+			startPosition = cursorPosition
+		}
+	}
+	redraw()
+}
+
+func handleBackspace() {
+	if search {
+		if len(searchString) > 0 {
+			searchString = searchString[0 : len(searchString)-1]
+		} else {
+			search = false
+			searchString = ""
+		}
+	}
+	formatAll()
+	redraw()
+}
+
+func handleCtrlR() {
+	if !running {
+		go func(forceReConnect bool) {
+			fetchTime = time.Now()
+			drawDate()
+			RunOnHosts(forceReConnect)
+		}(forceReConnect)
+	}
+}
+
+func handleKeyPressInSearch(r rune) {
+	if r > 31 && r < 127 && len(searchString) < 50 {
+		searchString += string(r)
+		cursorPosition = 0
+		formatAll()
+		redraw()
+	}
+}
+
 func keyLoop() {
 loop:
 	for {
@@ -478,106 +603,28 @@ loop:
 		case termbox.EventKey:
 			switch ev.Key {
 			case termbox.KeyCtrlR:
-				if !running {
-					go func(forceReConnect bool) {
-						fetchTime = time.Now()
-						drawDate()
-						RunOnHosts(forceReConnect)
-					}(forceReConnect)
-				}
+				handleCtrlR()
 			case termbox.KeyCtrlF:
 				search = true
 				redraw()
 			case termbox.KeyArrowUp:
-				if cursorPosition > 0 {
-					if cursorPosition == startPosition {
-						if startPosition > 0 {
-							startPosition--
-						}
-					}
-					cursorPosition--
-					redraw()
-				}
+				handleArrowUp()
 			case termbox.KeyArrowDown:
-				_, h := termbox.Size()
-				limit := len(tic.Data)
-				if search {
-					limit = matchingCount
-				}
-				if cursorPosition < limit-1 {
-					cursorPosition++
-					if cursorPosition == startPosition+(h-1-dataStartRow) {
-						if startPosition < len(tic.Data)-2 {
-							startPosition++
-						}
-					}
-					redraw()
-				}
+				handleArrowDown()
 			case termbox.KeyEnter:
 				openConsole()
 			case termbox.KeyEnd:
-				_, h := termbox.Size()
-				limit := len(tic.Data)
-				if search {
-					limit = matchingCount
-				}
-				cursorPosition = limit - 1
-				if limit < h-1-dataStartRow {
-					startPosition = 0
-				} else {
-					startPosition = limit - (h - 1 - dataStartRow)
-				}
-				redraw()
+				handleKeyEnd()
 			case termbox.KeyHome:
 				cursorPosition = 0
 				startPosition = 0
 				redraw()
 			case termbox.KeyPgdn:
-				_, h := termbox.Size()
-				pageSize := h - 1 - dataStartRow
-				dataLength := len(tic.Data)
-				if search {
-					dataLength = matchingCount
-				}
-				if cursorPosition+pageSize < dataLength {
-					cursorPosition += pageSize
-				} else {
-					cursorPosition = dataLength - 1
-				}
-				if dataLength < pageSize {
-					startPosition = 0
-				} else if startPosition+pageSize < dataLength-pageSize {
-					startPosition += pageSize
-				} else {
-					startPosition = dataLength - pageSize
-				}
-				redraw()
+				handlePageDown()
 			case termbox.KeyPgup:
-				_, h := termbox.Size()
-				pageSize := h - 1 - dataStartRow
-				if cursorPosition-pageSize < 0 {
-					cursorPosition = 0
-					startPosition = 0
-				} else {
-					cursorPosition -= pageSize
-					if cursorPosition < pageSize {
-						startPosition = 0
-					} else {
-						startPosition = cursorPosition
-					}
-				}
-				redraw()
+				handlePageUp()
 			case termbox.KeyBackspace2:
-				if search {
-					if len(searchString) > 0 {
-						searchString = searchString[0 : len(searchString)-1]
-					} else {
-						search = false
-						searchString = ""
-					}
-				}
-				formatAll()
-				redraw()
+				handleBackspace()
 			case termbox.KeyEsc:
 				if search {
 					search = false
@@ -589,12 +636,7 @@ loop:
 				}
 			}
 			if search {
-				if ev.Ch > 31 && ev.Ch < 127 && len(searchString) < 50 {
-					searchString += string(ev.Ch)
-					cursorPosition = 0
-					formatAll()
-					redraw()
-				}
+				handleKeyPressInSearch(ev.Ch)
 			} else {
 				switch ev.Ch {
 				case 102: // f
