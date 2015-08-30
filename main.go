@@ -16,7 +16,7 @@ import (
 
 var (
 	wg        sync.WaitGroup
-	command   = `uptime | awk '{print $(NF-2) $(NF-1) $NF}' && free | grep Mem | awk '{print ($3-$6-$7)/$2}' && netstat -ant | awk '{print $5}' | uniq -u | wc -l && nproc && df / | grep '/' | awk '{print $5}' && df -i / | grep '/' | awk '{print $5}' && cat /proc/uptime | awk '{print $1}' && top -b -n2 | grep "Cpu(s)"|tail -n 1 | awk '{print $2 + $4}'`
+	command   = `cat /proc/loadavg | awk '{print $1,$2,$3}' && free | grep Mem | awk '{print ($3-$6-$7)/$2}' && netstat -ant | awk '{print $5}' | uniq -u | wc -l && nproc && df / | grep '/' | awk '{print $5}' && df -i / | grep '/' | awk '{print $5}' && cat /proc/uptime | awk '{print $1}' && top -b -n2 | grep "Cpu(s)"|tail -n 1 | awk '{print $2 + $4}'`
 	machines  map[string]*Machine
 	signer    *ssh.Signer
 	sorter    Sorter
@@ -78,7 +78,7 @@ func runOnHost(command string, machine string, forceReConnect bool) {
 
 func populate(machines *Machine, result string) {
 	s := strings.Split(result, "\n")
-	loads := strings.Split(s[0], ",")
+	loads := strings.Split(s[0], " ")
 	l1, err := strconv.ParseFloat(loads[0], 32)
 	if err != nil {
 		l1 = -1
