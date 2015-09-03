@@ -20,6 +20,7 @@ Data file must contain a JSON array of remote machines in following format:
 ...
 ]
 ```
+`name`, `user`, `host` and `port` are mandatory fields.
 
 Each entry for a machine can contain error and warning levels for following parameters:
 * load1 - 1 minute load average (`cat /proc/loadavg`)
