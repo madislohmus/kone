@@ -106,7 +106,6 @@ func redraw() {
 }
 
 func formatAll() {
-	matchingCount = 0
 	for _, k := range sorter.keys {
 		formatMachine(k)
 	}
@@ -166,11 +165,12 @@ func formatName(d *Machine) {
 	if showIPs {
 		name = d.config.Host
 	}
-	matchingMachines[d.Name] = false
 	idx := strings.Index(strings.ToLower(name), strings.ToLower(searchString))
 	if idx > -1 {
-		matchingMachines[d.Name] = true
-		matchingCount += 1
+		if !matchingMachines[d.Name] {
+			matchingMachines[d.Name] = true
+			matchingCount += 1
+		}
 	}
 	for i, r := range name {
 		s.Runes = append(s.Runes, r)
@@ -448,16 +448,20 @@ func drawAtIndex(i int, name string, flush bool) {
 
 func adjustStartPosition() {
 	_, h := termbox.Size()
-	if h > (len(tic.Data) + dataStartRow) {
+	limit := len(tic.Data)
+	if search {
+		limit = matchingCount
+	}
+	if h > (limit + dataStartRow) {
 		startPosition = 0
 	} else {
-		if startPosition+h-1-dataStartRow > len(tic.Data) {
-			startPosition = len(tic.Data) - (h - dataStartRow)
+		if startPosition+h-1-dataStartRow > limit {
+			startPosition = limit - (h - dataStartRow)
 		}
 	}
 }
 
-func openConsole() {
+func getSelectedMachine() *Machine {
 	key := sorter.keys[cursorPosition]
 	if search {
 		i := 0
@@ -470,8 +474,13 @@ func openConsole() {
 			}
 		}
 	}
-	name := machines[key].Name
-	user := machines[key].config.User
+	return machines[key]
+}
+
+func openConsole() {
+	m := getSelectedMachine()
+	name := m.Name
+	user := m.config.User
 	cmd := exec.Command("urxvt", "-e", "ssh", fmt.Sprintf("%s@%s", user, name))
 	go func() {
 		err := cmd.Run()
@@ -502,7 +511,7 @@ func handleArrowDown() {
 	if cursorPosition < limit-1 {
 		cursorPosition++
 		if cursorPosition == startPosition+(h-1-dataStartRow) {
-			if startPosition < len(tic.Data)-2 {
+			if startPosition < limit-2 {
 				startPosition++
 			}
 		}
@@ -588,11 +597,12 @@ func handleCtrlA() {
 }
 
 func handleCtrlR() {
-	if !machines[sorter.keys[cursorPosition]].Fetching {
+	m := getSelectedMachine()
+	if !m.Fetching {
 		go func(forceReConnect bool) {
 			fetchTime = time.Now()
 			drawDate()
-			RunOnHost(machines[sorter.keys[cursorPosition]].Name, forceReConnect)
+			RunOnHost(m.Name, forceReConnect)
 		}(forceReConnect)
 	}
 }
@@ -601,6 +611,10 @@ func handleKeyPressInSearch(r rune) {
 	if r > 31 && r < 127 && len(searchString) < 50 {
 		searchString += string(r)
 		cursorPosition = 0
+		matchingCount = 0
+		for k, _ := range matchingMachines {
+			matchingMachines[k] = false
+		}
 		formatAll()
 		redraw()
 	}
@@ -641,6 +655,7 @@ loop:
 				if search {
 					search = false
 					searchString = ""
+					matchingCount = 0
 					formatAll()
 					redraw()
 				} else {
