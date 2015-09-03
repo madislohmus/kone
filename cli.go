@@ -577,12 +577,22 @@ func handleBackspace() {
 	redraw()
 }
 
-func handleCtrlR() {
+func handleCtrlA() {
 	if !running {
 		go func(forceReConnect bool) {
 			fetchTime = time.Now()
 			drawDate()
 			RunOnHosts(forceReConnect)
+		}(forceReConnect)
+	}
+}
+
+func handleCtrlR() {
+	if !machines[sorter.keys[cursorPosition]].Fetching {
+		go func(forceReConnect bool) {
+			fetchTime = time.Now()
+			drawDate()
+			RunOnHost(machines[sorter.keys[cursorPosition]].Name, forceReConnect)
 		}(forceReConnect)
 	}
 }
@@ -602,6 +612,8 @@ loop:
 		switch ev := termbox.PollEvent(); ev.Type {
 		case termbox.EventKey:
 			switch ev.Key {
+			case termbox.KeyCtrlA:
+				handleCtrlA()
 			case termbox.KeyCtrlR:
 				handleCtrlR()
 			case termbox.KeyCtrlF:
@@ -650,14 +662,6 @@ loop:
 					showIPs = !showIPs
 					formatAll()
 					redraw()
-				case 114: // r
-					if !machines[sorter.keys[cursorPosition]].Fetching {
-						go func(forceReConnect bool) {
-							fetchTime = time.Now()
-							drawDate()
-							RunOnHost(machines[sorter.keys[cursorPosition]].Name, forceReConnect)
-						}(forceReConnect)
-					}
 				}
 			}
 		case termbox.EventResize:
