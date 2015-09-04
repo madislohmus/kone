@@ -488,7 +488,7 @@ func openConsole(command string) {
 		*terminal = "urxvt"
 	}
 	params := []string{"-e", "ssh", "-t", fmt.Sprintf("%s@%s", user, name), "-p", m.Port, command}
-	cmd := exec.Command(*terminal, params)
+	cmd := exec.Command(*terminal, params...)
 	go func() {
 		err := cmd.Run()
 		if err != nil {
