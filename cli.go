@@ -487,7 +487,8 @@ func openConsole(command string) {
 	if len(*terminal) == 0 {
 		*terminal = "urxvt"
 	}
-	cmd := exec.Command(*terminal, "-e", "ssh", "-t", fmt.Sprintf("%s@%s", user, name), "-p", m.Port, command)
+	params := []string{"-e", "ssh", "-t", fmt.Sprintf("%s@%s", user, name), "-p", m.Port, command}
+	cmd := exec.Command(*terminal, params)
 	go func() {
 		err := cmd.Run()
 		if err != nil {
@@ -634,6 +635,28 @@ loop:
 			switch ev.Key {
 			case termbox.KeyF1:
 				openConsole(F1)
+			case termbox.KeyF2:
+				openConsole(F2)
+			case termbox.KeyF3:
+				openConsole(F3)
+			case termbox.KeyF4:
+				openConsole(F4)
+			case termbox.KeyF5:
+				openConsole(F5)
+			case termbox.KeyF6:
+				openConsole(F6)
+			case termbox.KeyF7:
+				openConsole(F7)
+			case termbox.KeyF8:
+				openConsole(F8)
+			case termbox.KeyF9:
+				openConsole(F9)
+			case termbox.KeyF10:
+				openConsole(F10)
+			case termbox.KeyF11:
+				openConsole(F11)
+			case termbox.KeyF12:
+				openConsole(F12)
 			case termbox.KeyCtrlA:
 				handleCtrlA()
 			case termbox.KeyCtrlR:
