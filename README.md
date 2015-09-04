@@ -3,7 +3,7 @@ Simple CLI for getting simple status info from multiple machines.
 
 ## Usage
 ```
-./kone -data <data file path> -key <key file path> [-pass <key password file path>]
+./kone -data <data file path> -key <key file path> [-pass <key password file path>] [-cmd <custom commands file path>]
 ```
 
 Data file must contain a JSON array of remote machines in following format:
@@ -32,7 +32,12 @@ Each entry for a machine can contain error and warning levels for following para
 * inode - inode usage in percentage (`df -i / | grep '/' | awk '{print $5}'`)
 * conns - connections count (`netstat -ant | awk '{print $5}' | uniq -u | wc -l`)
 
-Key file is for example ~/.ssh/id_rsa, and password file is a file that contains only the password for sha key, if the key has been password protected.
+Key file is for example ~/.ssh/id_rsa, and password file is a file that contains only the password for sha key, if the key has been password protected. Custom commands are mapped to F1-F12. A file can be passed as a parameter that contains custom commands with following syntax:
+```
+F1=cmd1
+F2=cmd2
+...
+```
 
 The program connects to machines through ssh. At every 5 minutes (or when invoked manually) it runs the above mentioned commands on a machine to gather status information.
 
@@ -44,6 +49,7 @@ Keys:
 * `ctrl + a` - reload status info for all machines
 * `ctrl + f` - search (machine name / IP)
 * `Enter` - open shell to selected machine
+* `F1-12` - open a shell to the selected machine and issue the command (if any) assigned to the F-key.
 * `Esc` - exit search / program
 
 ## Screenshot
