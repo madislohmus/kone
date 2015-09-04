@@ -2,9 +2,13 @@ package main
 
 import (
 	"flag"
+	"fmt"
 	"github.com/madislohmus/gosh"
 	"github.com/nsf/termbox-go"
 	"golang.org/x/crypto/ssh"
+	"io/ioutil"
+	"os"
+	"os/user"
 	"strings"
 )
 
@@ -74,7 +78,22 @@ var (
 	dataFile  = flag.String("data", "", "input file")
 	keyFile   = flag.String("key", "", "ssh key file")
 	passFile  = flag.String("pass", "", "key password file (optional)")
+	terminal  = flag.String("term", os.Getenv("TERM"), "terminal")
+	cmdFile   = flag.String("cmd", "", "command file")
 	sleepTime = flag.Int("t", 300, "sleep time between refresh in seconds")
+
+	F1  string
+	F2  string
+	F3  string
+	F4  string
+	F5  string
+	F6  string
+	F7  string
+	F8  string
+	F9  string
+	F10 string
+	F11 string
+	F12 string
 )
 
 func (s Sorter) Len() int {
@@ -110,8 +129,55 @@ func sortByStatus(m1, m2 *Machine) bool {
 	return m1.Status > m2.Status
 }
 
+func getCommandsFromFile() error {
+	if strings.HasPrefix(*cmdFile, "~") {
+		u, err := user.Current()
+		if err != nil {
+			return err
+		}
+		*cmdFile = strings.Replace(*cmdFile, "~", u.HomeDir, 1)
+	}
+	data, err := ioutil.ReadFile(*cmdFile)
+	if err != nil {
+		return err
+	}
+	for _, line := range strings.Split(string(data), "\n") {
+		strs := strings.Split(line, "=")
+		if strs[0] == "F1" {
+			F1 = strs[1]
+		} else if strs[0] == "F2" {
+			F2 = strs[1]
+		} else if strs[0] == "F3" {
+			F3 = strs[1]
+		} else if strs[0] == "F4" {
+			F4 = strs[1]
+		} else if strs[0] == "F5" {
+			F5 = strs[1]
+		} else if strs[0] == "F6" {
+			F6 = strs[1]
+		} else if strs[0] == "F7" {
+			F7 = strs[1]
+		} else if strs[0] == "F8" {
+			F8 = strs[1]
+		} else if strs[0] == "F9" {
+			F9 = strs[1]
+		} else if strs[0] == "F10" {
+			F10 = strs[1]
+		} else if strs[0] == "F11" {
+			F11 = strs[1]
+		} else if strs[0] == "F12" {
+			F12 = strs[1]
+		}
+	}
+	return nil
+}
+
 func init() {
 	if !flag.Parsed() {
 		flag.Parse()
+	}
+	if *cmdFile != "" {
+		getCommandsFromFile()
+	} else {
 	}
 }

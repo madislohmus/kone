@@ -477,11 +477,17 @@ func getSelectedMachine() *Machine {
 	return machines[key]
 }
 
-func openConsole() {
+func openConsole(command string) {
 	m := getSelectedMachine()
 	name := m.Name
 	user := m.config.User
-	cmd := exec.Command("urxvt", "-e", "ssh", fmt.Sprintf("%s@%s", user, name))
+	if len(strings.TrimSpace(command)) > 0 {
+		command = fmt.Sprintf("%s; bash -l", command)
+	}
+	if len(*terminal) == 0 {
+		*terminal = "urxvt"
+	}
+	cmd := exec.Command(*terminal, "-e", "ssh", "-t", fmt.Sprintf("%s@%s", user, name), command)
 	go func() {
 		err := cmd.Run()
 		if err != nil {
@@ -626,6 +632,8 @@ loop:
 		switch ev := termbox.PollEvent(); ev.Type {
 		case termbox.EventKey:
 			switch ev.Key {
+			case termbox.KeyF1:
+				openConsole(F1)
 			case termbox.KeyCtrlA:
 				handleCtrlA()
 			case termbox.KeyCtrlR:
@@ -638,7 +646,7 @@ loop:
 			case termbox.KeyArrowDown:
 				handleArrowDown()
 			case termbox.KeyEnter:
-				openConsole()
+				openConsole("")
 			case termbox.KeyEnd:
 				handleKeyEnd()
 			case termbox.KeyHome:
