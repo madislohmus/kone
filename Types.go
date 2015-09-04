@@ -2,7 +2,6 @@ package main
 
 import (
 	"flag"
-	"fmt"
 	"github.com/madislohmus/gosh"
 	"github.com/nsf/termbox-go"
 	"golang.org/x/crypto/ssh"
