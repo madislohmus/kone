@@ -20,6 +20,7 @@ Data file must contain a JSON array of remote machines in following format:
 ...
 ]
 ```
+`name`, `user`, `host` and `port` are mandatory fields.
 
 Each entry for a machine can contain error and warning levels for following parameters:
 * load1 - 1 minute load average (`cat /proc/loadavg`)
@@ -39,8 +40,8 @@ Keys:
 * `f` - forces re-connect to machines
 * `s` - only warning and error information is displayed.
 * `i` - machine IP is shown instead of its name
-* `r` - reload status info for currently selected machine
-* `ctrl + r` -  reload status info for all machines
+* `ctrl + r` -  reload status info for currently selected machine
+* `ctrl + a` - reload status info for all machines
 * `ctrl + f` - search (machine name / IP)
 * `Enter` - open shell to selected machine
 * `Esc` - exit search / program
