@@ -69,11 +69,17 @@ func runOnHost(command string, machine string, forceReConnect bool) {
 			populate(machines[key], result)
 			setMachineStatus(machines[key])
 		}
-		sort.Sort(sorter)
 		formatMachine(key)
+		sortMachinesWithLocking()
 		redraw()
 		wg.Done()
 	}(machine)
+}
+
+func sortMachinesWithLocking() {
+	mutex.Lock()
+	sort.Sort(sorter)
+	mutex.Unlock()
 }
 
 func populate(machines *Machine, result string) {

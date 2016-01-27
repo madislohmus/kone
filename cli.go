@@ -167,8 +167,8 @@ func formatName(d *Machine) {
 	}
 	idx := strings.Index(strings.ToLower(name), strings.ToLower(searchString))
 	if idx > -1 {
-		if !matchingMachines[d.Name] {
-			matchingMachines[d.Name] = true
+		if !matchingMachines[name] {
+			matchingMachines[name] = true
 			matchingCount += 1
 		}
 	}
@@ -302,9 +302,9 @@ func formatUptime(d *Machine) {
 	} else {
 		for _, r := range formatDuration(d.Uptime) {
 			s.Runes = append(s.Runes, r)
-			if d.Uptime < 60 {
+			if d.Uptime < 3600 {
 				s.FG = append(s.FG, 8)
-			} else if d.Uptime < 3600 {
+			} else if d.Uptime < 24*3600 {
 				s.FG = append(s.FG, 4|termbox.AttrBold)
 			} else {
 				s.FG = append(s.FG, 9)
