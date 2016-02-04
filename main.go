@@ -16,15 +16,17 @@ import (
 )
 
 var (
-	wg                 sync.WaitGroup
-	command            = `cat /proc/loadavg | awk '{print $1,$2,$3}' && free | grep Mem | awk '{print ($3-$6-$7)/$2}' && netstat -ant | awk '{print $5}' | uniq -u | wc -l && nproc && df / | grep '/' | awk '{print $5}' && df -i / | grep '/' | awk '{print $5}' && cat /proc/uptime | awk '{print $1}' && top -b -n2 | grep "Cpu(s)"|tail -n 1 | awk '{print $2 + $4}'`
-	machines           map[string]*Machine
-	signer             *ssh.Signer
-	sorter             Sorter
-	running            bool
-	fetchTime          time.Time
-	sortRequestChannel chan bool
-	listNeedsSorting   bool
+	wg                   sync.WaitGroup
+	command              = `cat /proc/loadavg | awk '{print $1,$2,$3}' && free | grep Mem | awk '{print ($3-$6-$7)/$2}' && netstat -ant | awk '{print $5}' | uniq -u | wc -l && nproc && df / | grep '/' | awk '{print $5}' && df -i / | grep '/' | awk '{print $5}' && cat /proc/uptime | awk '{print $1}' && top -b -n2 | grep "Cpu(s)"|tail -n 1 | awk '{print $2 + $4}'`
+	machines             map[string]*Machine
+	signer               *ssh.Signer
+	sorter               Sorter
+	running              bool
+	fetchTime            time.Time
+	sortRequestChannel   chan bool
+	redrawRequestChannel chan bool
+	listNeedsSorting     bool
+	cliNeedsRedraw       bool
 )
 
 func RunOnHost(machine string, forceReConnect bool) {
@@ -93,7 +95,7 @@ func sortingRoutine() {
 			listNeedsSorting = false
 			mutex.Unlock()
 			sort.Sort(sorter)
-			redraw()
+			sendRedrawRequest()
 		}
 	}
 }
@@ -322,22 +324,40 @@ func populateMachines() error {
 	return nil
 }
 
-func main() {
+func getSigner() *ssh.Signer {
 	var p []byte
 	if *passFile != "" {
 		pass, err := getPassword()
 		if err != nil {
 			fmt.Printf("Could not get password!")
-			return
+			return nil
 		}
 		p = pass
 	}
 	s, err := gosh.GetSigner(*keyFile, string(p))
 	if err != nil {
 		fmt.Println("Could not get signer!")
+		return nil
+	}
+	return s
+}
+
+func updateRoutine() {
+	for {
+		if !running {
+			fetchTime = time.Now()
+			drawDate()
+			RunOnHosts(false)
+		}
+		time.Sleep(time.Duration(*sleepTime) * time.Second)
+	}
+}
+
+func main() {
+	signer = getSigner()
+	if signer == nil {
 		return
 	}
-	signer = s
 	if err := populateMachines(); err != nil {
 		fmt.Printf("%s", err.Error())
 		return
@@ -348,20 +368,11 @@ func main() {
 		sorter.keys = append(sorter.keys, k)
 		formatMachine(k)
 	}
-	sortRequestChannel = make(chan bool, 100)
+	sortRequestChannel = make(chan bool, 10)
+	redrawRequestChannel = make(chan bool, 10)
+	go redrawRoutine()
 	go sortingRoutine()
+	go updateRoutine()
 	sendSortingRequest()
-
-	go func() {
-		for {
-			if !running {
-				fetchTime = time.Now()
-				drawDate()
-				RunOnHosts(false)
-			}
-			time.Sleep(time.Duration(*sleepTime) * time.Second)
-		}
-	}()
 	runCli()
-
 }

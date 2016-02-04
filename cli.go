@@ -101,9 +101,7 @@ func redraw() {
 			drawAtIndex(i, k, false)
 		}
 	}
-	mutex.Lock()
 	termbox.Flush()
-	mutex.Unlock()
 }
 
 func formatAll() {
@@ -156,7 +154,7 @@ func rowToHeader(s *StyledText, machine string, header string) {
 	tic.Data[machine][headerToIndex[header]] = *s
 	if len(s.Runes) > tic.ColumnWidth[header] {
 		tic.ColumnWidth[header] = len(s.Runes)
-		redraw()
+		sendRedrawRequest()
 	}
 }
 
@@ -506,7 +504,7 @@ func handleArrowUp() {
 			}
 		}
 		cursorPosition--
-		redraw()
+		sendRedrawRequest()
 	}
 }
 
@@ -523,7 +521,7 @@ func handleArrowDown() {
 				startPosition++
 			}
 		}
-		redraw()
+		sendRedrawRequest()
 	}
 }
 
@@ -539,7 +537,7 @@ func handleKeyEnd() {
 	} else {
 		startPosition = limit - (h - 1 - dataStartRow)
 	}
-	redraw()
+	sendRedrawRequest()
 }
 
 func handlePageDown() {
@@ -561,7 +559,7 @@ func handlePageDown() {
 	} else {
 		startPosition = dataLength - pageSize
 	}
-	redraw()
+	sendRedrawRequest()
 }
 
 func handlePageUp() {
@@ -578,7 +576,7 @@ func handlePageUp() {
 			startPosition = cursorPosition
 		}
 	}
-	redraw()
+	sendRedrawRequest()
 }
 
 func handleBackspace() {
@@ -591,7 +589,7 @@ func handleBackspace() {
 		}
 	}
 	formatAll()
-	redraw()
+	sendRedrawRequest()
 }
 
 func handleCtrlA() {
@@ -624,7 +622,7 @@ func handleKeyPressInSearch(r rune) {
 			matchingMachines[k] = false
 		}
 		formatAll()
-		redraw()
+		sendRedrawRequest()
 	}
 }
 
@@ -664,7 +662,7 @@ loop:
 				handleCtrlR()
 			case termbox.KeyCtrlF:
 				search = true
-				redraw()
+				sendRedrawRequest()
 			case termbox.KeyArrowUp:
 				handleArrowUp()
 			case termbox.KeyArrowDown:
@@ -676,7 +674,7 @@ loop:
 			case termbox.KeyHome:
 				cursorPosition = 0
 				startPosition = 0
-				redraw()
+				sendRedrawRequest()
 			case termbox.KeyPgdn:
 				handlePageDown()
 			case termbox.KeyPgup:
@@ -689,7 +687,7 @@ loop:
 					searchString = ""
 					matchingCount = 0
 					formatAll()
-					redraw()
+					sendRedrawRequest()
 				} else {
 					break loop
 				}
@@ -707,9 +705,28 @@ loop:
 					showIPs = !showIPs
 					formatAll()
 				}
-				redraw()
+				sendRedrawRequest()
 			}
 		case termbox.EventResize:
+			sendRedrawRequest()
+		}
+	}
+}
+
+func sendRedrawRequest() {
+	mutex.Lock()
+	cliNeedsRedraw = true
+	mutex.Unlock()
+	redrawRequestChannel <- true
+}
+
+func redrawRoutine() {
+	for {
+		<-redrawRequestChannel
+		if cliNeedsRedraw {
+			mutex.Lock()
+			cliNeedsRedraw = false
+			mutex.Unlock()
 			redraw()
 		}
 	}
@@ -722,6 +739,6 @@ func runCli() {
 	}
 	defer termbox.Close()
 	termbox.SetOutputMode(termbox.Output256)
-	redraw()
+	sendRedrawRequest()
 	keyLoop()
 }
