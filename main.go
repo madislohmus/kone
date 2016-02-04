@@ -3,8 +3,6 @@ package main
 import (
 	"encoding/json"
 	"fmt"
-	"github.com/madislohmus/gosh"
-	"golang.org/x/crypto/ssh"
 	"io/ioutil"
 	"net"
 	"sort"
@@ -12,16 +10,21 @@ import (
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/madislohmus/gosh"
+	"golang.org/x/crypto/ssh"
 )
 
 var (
-	wg        sync.WaitGroup
-	command   = `cat /proc/loadavg | awk '{print $1,$2,$3}' && free | grep Mem | awk '{print ($3-$6-$7)/$2}' && netstat -ant | awk '{print $5}' | uniq -u | wc -l && nproc && df / | grep '/' | awk '{print $5}' && df -i / | grep '/' | awk '{print $5}' && cat /proc/uptime | awk '{print $1}' && top -b -n2 | grep "Cpu(s)"|tail -n 1 | awk '{print $2 + $4}'`
-	machines  map[string]*Machine
-	signer    *ssh.Signer
-	sorter    Sorter
-	running   bool
-	fetchTime time.Time
+	wg                 sync.WaitGroup
+	command            = `cat /proc/loadavg | awk '{print $1,$2,$3}' && free | grep Mem | awk '{print ($3-$6-$7)/$2}' && netstat -ant | awk '{print $5}' | uniq -u | wc -l && nproc && df / | grep '/' | awk '{print $5}' && df -i / | grep '/' | awk '{print $5}' && cat /proc/uptime | awk '{print $1}' && top -b -n2 | grep "Cpu(s)"|tail -n 1 | awk '{print $2 + $4}'`
+	machines           map[string]*Machine
+	signer             *ssh.Signer
+	sorter             Sorter
+	running            bool
+	fetchTime          time.Time
+	sortRequestChannel chan bool
+	listNeedsSorting   bool
 )
 
 func RunOnHost(machine string, forceReConnect bool) {
@@ -70,16 +73,29 @@ func runOnHost(command string, machine string, forceReConnect bool) {
 			setMachineStatus(machines[key])
 		}
 		formatMachine(key)
-		sortMachinesWithLocking()
-		redraw()
+		sendSortingRequest()
 		wg.Done()
 	}(machine)
 }
 
-func sortMachinesWithLocking() {
+func sendSortingRequest() {
 	mutex.Lock()
-	sort.Sort(sorter)
+	listNeedsSorting = true
 	mutex.Unlock()
+	sortRequestChannel <- true
+}
+
+func sortingRoutine() {
+	for {
+		<-sortRequestChannel
+		if listNeedsSorting {
+			mutex.Lock()
+			listNeedsSorting = false
+			mutex.Unlock()
+			sort.Sort(sorter)
+			redraw()
+		}
+	}
 }
 
 func populate(machines *Machine, result string) {
@@ -332,7 +348,9 @@ func main() {
 		sorter.keys = append(sorter.keys, k)
 		formatMachine(k)
 	}
-	sort.Sort(sorter)
+	sortRequestChannel = make(chan bool, 100)
+	go sortingRoutine()
+	sendSortingRequest()
 
 	go func() {
 		for {

@@ -2,12 +2,13 @@ package main
 
 import (
 	"fmt"
-	"github.com/nsf/termbox-go"
 	"math"
 	"os/exec"
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/nsf/termbox-go"
 )
 
 var (
@@ -699,16 +700,14 @@ loop:
 				switch ev.Ch {
 				case 102: // f
 					forceReConnect = !forceReConnect
-					redraw()
 				case 115: // s
 					silent = !silent
 					formatAll()
-					redraw()
 				case 105: // i
 					showIPs = !showIPs
 					formatAll()
-					redraw()
 				}
+				redraw()
 			}
 		case termbox.EventResize:
 			redraw()
