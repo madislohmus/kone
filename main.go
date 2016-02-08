@@ -25,8 +25,6 @@ var (
 	fetchTime            time.Time
 	sortRequestChannel   chan bool
 	redrawRequestChannel chan bool
-	listNeedsSorting     bool
-	cliNeedsRedraw       bool
 )
 
 func RunOnHost(machine string, forceReConnect bool) {
