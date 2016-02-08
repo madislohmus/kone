@@ -714,21 +714,16 @@ loop:
 }
 
 func sendRedrawRequest() {
-	mutex.Lock()
-	cliNeedsRedraw = true
-	mutex.Unlock()
 	redrawRequestChannel <- true
 }
 
 func redrawRoutine() {
 	for {
 		<-redrawRequestChannel
-		if cliNeedsRedraw {
-			mutex.Lock()
-			cliNeedsRedraw = false
-			mutex.Unlock()
-			redraw()
+		for len(redrawRequestChannel) > 0 {
+			<-redrawRequestChannel
 		}
+		redraw()
 	}
 }
 

@@ -81,22 +81,17 @@ func runOnHost(command string, machine string, forceReConnect bool) {
 }
 
 func sendSortingRequest() {
-	mutex.Lock()
-	listNeedsSorting = true
-	mutex.Unlock()
 	sortRequestChannel <- true
 }
 
 func sortingRoutine() {
 	for {
 		<-sortRequestChannel
-		if listNeedsSorting {
-			mutex.Lock()
-			listNeedsSorting = false
-			mutex.Unlock()
-			sort.Sort(sorter)
-			sendRedrawRequest()
+		for len(sortRequestChannel) > 0 {
+			<-sortRequestChannel
 		}
+		sort.Sort(sorter)
+		sendRedrawRequest()
 	}
 }
 
