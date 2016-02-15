@@ -177,11 +177,11 @@ func getCPUStatus(machine *Machine) int {
 	cpu := machine.CPU.Value.(float32)
 	warn, ok := machine.CPU.Warning.(float64)
 	if !ok {
-		warn = 90
+		warn = 80
 	}
 	err, ok := machine.CPU.Error.(float64)
 	if !ok {
-		err = 80
+		err = 90
 	}
 	if cpu < float32(warn)*(float32(machine.Nproc)) {
 		return StatusOK
