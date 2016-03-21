@@ -42,8 +42,8 @@ var (
 	selectedBg = termbox.ColorBlack | termbox.AttrBold
 	selectedFg = termbox.ColorWhite | termbox.AttrBold
 
-	mutex        sync.Mutex
-	searchString string
+	errorLayerMutex sync.Mutex
+	searchString    string
 )
 
 func newStyledText() StyledText {
@@ -120,11 +120,15 @@ func formatMachine(machine string) {
 		formatInode(d)
 		formatCons(d)
 		formatUptime(d)
+		errorLayerMutex.Lock()
 		delete(errorLayer, machine)
+		errorLayerMutex.Unlock()
 	} else {
 		clearInfo(machine)
 		if len(d.FetchingError) > 0 {
+			errorLayerMutex.Lock()
 			errorLayer[machine] = d.FetchingError
+			errorLayerMutex.Unlock()
 		}
 	}
 	formatName(d)
@@ -205,24 +209,22 @@ func formatLoads(d *Machine) {
 
 func formatLoad(load Measurement, d *Machine) *StyledText {
 	s := newStyledText()
-	lv := load.Value.(float32)
 	status := getLoadStatus(d, load)
 	if silent && (status == StatusOK) {
 		appendSilent(&s)
 	} else {
-		formatText(fmt.Sprintf("%.2f", lv), status, &s)
+		formatText(fmt.Sprintf("%.2f", load.Value.(float32)), status, &s)
 	}
 	return &s
 }
 
 func formatCPU(d *Machine) {
 	s := newStyledText()
-	cpu := d.CPU.Value.(float32)
 	status := getCPUStatus(d)
 	if silent && (status == StatusOK) {
 		appendSilent(&s)
 	} else {
-		formatText(fmt.Sprintf("%.1f", cpu), status, &s)
+		formatText(fmt.Sprintf("%.1f", d.CPU.Value.(float32)), status, &s)
 		for _, r := range fmt.Sprintf(":%d", d.Nproc) {
 			s.Runes = append(s.Runes, r)
 			s.FG = append(s.FG, 9)
@@ -234,50 +236,71 @@ func formatCPU(d *Machine) {
 
 func formatFree(d *Machine) {
 	s := newStyledText()
-	free := d.Free.Value.(float32)
 	status := getFreeStatus(d)
 	if silent && (status == StatusOK) {
 		appendSilent(&s)
 	} else {
-		formatText(fmt.Sprintf("%.2f", free), status, &s)
+		formatText(fmt.Sprintf("%.2f", d.Free.Value.(float32)), status, &s)
 	}
 	rowToHeader(&s, d.Name, hFree)
 }
 
 func formatStorage(d *Machine) {
 	s := newStyledText()
-	storage := d.Storage.Value.(int32)
 	status := getStorageStatus(d)
 	if silent && (status == StatusOK) {
 		appendSilent(&s)
 	} else {
-		formatText(fmt.Sprintf("%3d", storage), status, &s)
+		formatText(fmt.Sprintf("%3d", d.Storage.Value.(int32)), status, &s)
 	}
 	rowToHeader(&s, d.Name, hStorage)
 }
 
 func formatInode(d *Machine) {
 	s := newStyledText()
-	inode := d.Inode.Value.(int32)
 	status := getInodeStatus(d)
 	if silent && (status == StatusOK) {
 		appendSilent(&s)
 	} else {
-		formatText(fmt.Sprintf("%3d", inode), status, &s)
+		formatText(fmt.Sprintf("%3d", d.Inode.Value.(int32)), status, &s)
 	}
 	rowToHeader(&s, d.Name, hInode)
 }
 
 func formatCons(d *Machine) {
 	s := newStyledText()
-	conns := d.Connections.Value.(int32)
 	status := getConnectionsStatus(d)
 	if silent && (status == StatusOK) {
 		appendSilent(&s)
 	} else {
-		formatText(fmt.Sprintf("%d", conns), status, &s)
+		formatText(fmt.Sprintf("%d", d.Connections.Value.(int32)), status, &s)
 	}
 	rowToHeader(&s, d.Name, hCons)
+}
+
+func formatUptime(d *Machine) {
+	s := newStyledText()
+	status := getUptimeStatus(d)
+	if silent && (status == StatusOK) {
+		appendSilent(&s)
+	} else {
+		for _, r := range formatDuration(d.Uptime.Value.(int64)) {
+			s.Runes = append(s.Runes, r)
+			if status == StatusOK {
+				if d.Uptime.Value.(int64) < 24*60*60 {
+					s.FG = append(s.FG, termbox.ColorDefault)
+				} else {
+					s.FG = append(s.FG, 9)
+				}
+			} else if status == StatusWarning {
+				s.FG = append(s.FG, 4|termbox.AttrBold)
+			} else {
+				s.FG = append(s.FG, 2|termbox.AttrBold)
+			}
+			s.BG = append(s.BG, termbox.ColorDefault)
+		}
+	}
+	rowToHeader(&s, d.Name, hUptime)
 }
 
 func formatText(text string, status int, s *StyledText) {
@@ -294,24 +317,8 @@ func formatText(text string, status int, s *StyledText) {
 	}
 }
 
-func formatUptime(d *Machine) {
-	s := newStyledText()
-	if silent {
-		appendSilent(&s)
-	} else {
-		for _, r := range formatDuration(d.Uptime) {
-			s.Runes = append(s.Runes, r)
-			if d.Uptime < 3600 {
-				s.FG = append(s.FG, 8)
-			} else if d.Uptime < 24*3600 {
-				s.FG = append(s.FG, 4|termbox.AttrBold)
-			} else {
-				s.FG = append(s.FG, 9)
-			}
-			s.BG = append(s.BG, termbox.ColorDefault)
-		}
-	}
-	rowToHeader(&s, d.Name, hUptime)
+func formatUptimeText(text string, status int, s *StyledText) {
+
 }
 
 func drawHeader() {
@@ -427,6 +434,7 @@ func drawAtIndex(i int, name string, flush bool) {
 		currentTab += tic.ColumnWidth[he] + 1
 	}
 
+	errorLayerMutex.Lock()
 	if v, ok := errorLayer[name]; ok {
 		fg := termbox.ColorRed
 		if selected {
@@ -440,6 +448,7 @@ func drawAtIndex(i int, name string, flush bool) {
 			termbox.SetCell(len(index)+tic.ColumnWidth[hMachine]+j+3, row, r, fg, bg)
 		}
 	}
+	errorLayerMutex.Unlock()
 	if flush {
 		termbox.Flush()
 	}

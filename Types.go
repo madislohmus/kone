@@ -2,13 +2,14 @@ package main
 
 import (
 	"flag"
-	"github.com/madislohmus/gosh"
-	"github.com/nsf/termbox-go"
-	"golang.org/x/crypto/ssh"
 	"io/ioutil"
 	"os"
 	"os/user"
 	"strings"
+
+	"github.com/madislohmus/gosh"
+	"github.com/nsf/termbox-go"
+	"golang.org/x/crypto/ssh"
 )
 
 type (
@@ -42,7 +43,7 @@ type (
 		Storage       Measurement `json:"storage"`
 		Inode         Measurement `json:"inode"`
 		Connections   Measurement `json:"conns"`
-		Uptime        int64       `json:"utime"`
+		Uptime        Measurement `json:"utime"`
 		Nproc         int32       `json:"nproc"`
 		Fetching      bool
 		GotResult     bool

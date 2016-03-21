@@ -148,7 +148,7 @@ func populate(machines *Machine, result string) {
 	if err != nil {
 		ut = -1
 	}
-	machines.Uptime = int64(ut)
+	machines.Uptime.Value = int64(ut)
 
 	cpu, err := strconv.ParseFloat(s[7], 10)
 	if err != nil {
@@ -170,6 +170,7 @@ func setMachineStatus(machine *Machine) {
 	machine.Status |= getStorageStatus(machine)
 	machine.Status |= getInodeStatus(machine)
 	machine.Status |= getConnectionsStatus(machine)
+	machine.Status |= getUptimeStatus(machine)
 
 }
 
@@ -277,6 +278,24 @@ func getLoadStatus(machine *Machine, load Measurement) int {
 	if l < float32(warn) {
 		return StatusOK
 	} else if l < float32(err) {
+		return StatusWarning
+	}
+	return StatusError
+}
+
+func getUptimeStatus(machine *Machine) int {
+	ut := machine.Uptime.Value.(int64)
+	warn, ok := machine.Uptime.Warning.(float64)
+	if !ok {
+		warn = 90 * 24 * 60 * 60
+	}
+	err, ok := machine.Uptime.Error.(float64)
+	if !ok {
+		err = 100 * 24 * 60 * 60
+	}
+	if ut < int64(warn) {
+		return StatusOK
+	} else if ut < int64(err) {
 		return StatusWarning
 	}
 	return StatusError
