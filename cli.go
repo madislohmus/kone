@@ -317,10 +317,6 @@ func formatText(text string, status int, s *StyledText) {
 	}
 }
 
-func formatUptimeText(text string, status int, s *StyledText) {
-
-}
-
 func drawHeader() {
 	currentTab := 1
 	for _, h := range tic.Header {
