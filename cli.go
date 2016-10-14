@@ -11,24 +11,28 @@ import (
 	"github.com/nsf/termbox-go"
 )
 
+const (
+	headerRow    = 3
+	dateRow      = 1
+	dataStartRow = 4
+
+	hMachine = "Machine"
+	hLoad1   = "l1"
+	hLoad5   = "l5"
+	hLoad15  = "l15"
+	hCPU     = "CPU"
+	hFree    = "free"
+	hStorage = "/"
+	hInode   = "inode"
+	hCons    = "conns"
+	hUptime  = "uptime"
+)
+
 var (
 	tic           TextInColumns
 	errorLayer    map[string]string
 	headerToIndex map[string]int
-	hMachine      = "Machine"
-	hLoad1        = "l1"
-	hLoad5        = "l5"
-	hLoad15       = "l15"
-	hCPU          = "CPU"
-	hFree         = "free"
-	hStorage      = "/"
-	hInode        = "inode"
-	hCons         = "conns"
-	hUptime       = "uptime"
 
-	headerRow        = 3
-	dateRow          = 1
-	dataStartRow     = 4
 	startPosition    = 0
 	cursorPosition   = 0
 	matchingCount    = 0
@@ -44,6 +48,7 @@ var (
 
 	errorLayerMutex sync.Mutex
 	searchString    string
+	indexFormat     string
 )
 
 func newStyledText() StyledText {
@@ -80,6 +85,7 @@ func Init(m map[string]*Machine) {
 		}
 		matchingMachines[k] = false
 	}
+	indexFormat = "%" + fmt.Sprintf("%d", len(fmt.Sprintf("%d", len(m)))) + "d"
 }
 
 func redraw() {
@@ -403,7 +409,7 @@ func drawAtIndex(i int, name string, flush bool) {
 		termbox.SetCell(j, row, ' ', termbox.ColorDefault, bg)
 	}
 	currentTab := 1
-	index := fmt.Sprintf("%2d", i+1)
+	index := fmt.Sprintf(indexFormat, i+1)
 	for j, r := range index {
 		termbox.SetCell(currentTab+j, row, r, indexFg, bg)
 	}
