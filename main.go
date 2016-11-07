@@ -17,7 +17,7 @@ import (
 
 var (
 	wg                   sync.WaitGroup
-	command              = `cat /proc/loadavg | awk '{print $1,$2,$3}' && if [ $(free | grep available) ]; then free | grep Mem | awk '{print ($2-$7)/$2}'; else free | grep Mem | awk '{print ($3-$6-$7)/$2}'; fi && netstat -ant | awk '{print $5}' | uniq -u | wc -l && nproc && df / | grep '/' | awk '{print $5}' && df -i / | grep '/' | awk '{print $5}' && cat /proc/uptime | awk '{print $1}' && top -b -n2 | grep "Cpu(s)"|tail -n 1 | awk '{print $2 + $4}'`
+	command              = `cat /proc/loadavg | awk '{print $1,$2,$3}' && if [ "$(free | grep available)" ]; then free | grep Mem | awk '{print ($2-$7)/$2}'; else free | grep Mem | awk '{print ($3-$6-$7)/$2}'; fi && netstat -ant | awk '{print $5}' | uniq -u | wc -l && nproc && df / | grep '/' | awk '{print $5}' && df -i / | grep '/' | awk '{print $5}' && cat /proc/uptime | awk '{print $1}' && top -b -n2 | grep "Cpu(s)"|tail -n 1 | awk '{print $2 + $4}'`
 	machines             map[string]*Machine
 	signer               *ssh.Signer
 	sorter               Sorter
