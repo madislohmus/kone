@@ -15,9 +15,12 @@ import (
 	"golang.org/x/crypto/ssh"
 )
 
+const (
+	command = `cat /proc/loadavg | awk '{print $1,$2,$3}' && if [ "$(free | grep available)" ]; then free | grep Mem | awk '{print ($2-$7)/$2}'; else free | grep Mem | awk '{print ($3-$6-$7)/$2}'; fi && netstat -ant | awk '{print $5}' | uniq -u | wc -l && nproc && df | grep '/' | awk '{print $5}' | sort -g | awk '{printf "%s ",$0} END {print " "}' && df -i / | grep '/' | awk '{print $5}' && cat /proc/uptime | awk '{print $1}' && top -b -n2 | grep "Cpu(s)"|tail -n 1 | awk '{print $2 + $4}'`
+)
+
 var (
 	wg                   sync.WaitGroup
-	command              = `cat /proc/loadavg | awk '{print $1,$2,$3}' && if [ "$(free | grep available)" ]; then free | grep Mem | awk '{print ($2-$7)/$2}'; else free | grep Mem | awk '{print ($3-$6-$7)/$2}'; fi && netstat -ant | awk '{print $5}' | uniq -u | wc -l && nproc && df / | grep '/' | awk '{print $5}' && df -i / | grep '/' | awk '{print $5}' && cat /proc/uptime | awk '{print $1}' && top -b -n2 | grep "Cpu(s)"|tail -n 1 | awk '{print $2 + $4}'`
 	machines             map[string]*Machine
 	signer               *ssh.Signer
 	sorter               Sorter
@@ -132,11 +135,16 @@ func populate(machines *Machine, result string) {
 	}
 	machines.Nproc = int32(nproc)
 
-	stor, err := strconv.ParseInt(strings.TrimRight(s[4], "%"), 10, 32)
-	if err != nil {
-		stor = -1
+	driveUsages := strings.Split(strings.TrimSpace(s[4]), " ")
+	drives := []int32{}
+	for _, usage := range driveUsages {
+		stor, err := strconv.ParseInt(strings.TrimRight(usage, "%"), 10, 32)
+		if err != nil {
+			stor = -1
+		}
+		drives = append(drives, int32(stor))
 	}
-	machines.Storage.Value = int32(stor)
+	machines.Storage.Value = drives
 
 	inode, err := strconv.ParseInt(strings.TrimRight(s[5], "%"), 10, 32)
 	if err != nil {
@@ -211,7 +219,6 @@ func getFreeStatus(machine *Machine) int {
 }
 
 func getStorageStatus(machine *Machine) int {
-	storage := machine.Storage.Value.(int32)
 	warn, ok := machine.Storage.Warning.(float64)
 	if !ok {
 		warn = 80
@@ -220,9 +227,17 @@ func getStorageStatus(machine *Machine) int {
 	if !ok {
 		err = 90
 	}
-	if storage < int32(warn) {
+	status := StatusOK
+	for _, value := range machine.Storage.Value.([]int32) {
+		status |= getIndividualStorageStatus(value, warn, err)
+	}
+	return status
+}
+
+func getIndividualStorageStatus(value int32, warn, err float64) int {
+	if value < int32(warn) {
 		return StatusOK
-	} else if storage < int32(err) {
+	} else if value < int32(err) {
 		return StatusWarning
 	}
 	return StatusError

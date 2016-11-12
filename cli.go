@@ -22,7 +22,7 @@ const (
 	hLoad15  = "l15"
 	hCPU     = "CPU"
 	hFree    = "free"
-	hStorage = "/"
+	hStorage = "storage"
 	hInode   = "inode"
 	hCons    = "conns"
 	hUptime  = "uptime"
@@ -253,11 +253,17 @@ func formatFree(d *Machine) {
 
 func formatStorage(d *Machine) {
 	s := newStyledText()
-	status := getStorageStatus(d)
-	if silent && (status == StatusOK) {
-		appendSilent(&s)
-	} else {
-		formatText(fmt.Sprintf("%3d", d.Storage.Value.(int32)), status, &s)
+	warn, ok := d.Storage.Warning.(float64)
+	if !ok {
+		warn = 80
+	}
+	err, ok := d.Storage.Error.(float64)
+	if !ok {
+		err = 90
+	}
+	for _, datum := range d.Storage.Value.([]int32) {
+
+		formatText(string(rune(9601+int(float32(datum)/(12.5)))), getIndividualStorageStatus(datum, warn, err), &s)
 	}
 	rowToHeader(&s, d.Name, hStorage)
 }
