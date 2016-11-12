@@ -16,7 +16,15 @@ import (
 )
 
 const (
-	command = `cat /proc/loadavg | awk '{print $1,$2,$3}' && if [ "$(free | grep available)" ]; then free | grep Mem | awk '{print ($2-$7)/$2}'; else free | grep Mem | awk '{print ($3-$6-$7)/$2}'; fi && netstat -ant | awk '{print $5}' | uniq -u | wc -l && nproc && df | grep '/' | awk '{print $5}' | sort -g | awk '{printf "%s ",$0} END {print " "}' && df -i / | grep '/' | awk '{print $5}' && cat /proc/uptime | awk '{print $1}' && top -b -n2 | grep "Cpu(s)"|tail -n 1 | awk '{print $2 + $4}'`
+	loadCmd    = `cat /proc/loadavg | awk '{print $1,$2,$3}'`
+	freeCmd    = `if [ "$(free | grep available)" ]; then free | grep Mem | awk '{print ($2-$7)/$2}'; else free | grep Mem | awk '{print ($3-$6-$7)/$2}'; fi`
+	connsCmd   = `netstat -ant | awk '{print $5}' | uniq -u | wc -l`
+	procCmd    = `nproc`
+	storageCmd = `df -x tmpfs | grep '/' | awk '{print $5}' | sort -g | awk '{printf "%s ",$0} END {print " "}'`
+	inodeCmd   = `df -i / | grep '/' | awk '{print $5}'`
+	uptimeCmd  = `cat /proc/uptime | awk '{print $1}'`
+	cpuUtilCmd = `top -b -n2 | grep "Cpu(s)"| tail -n 1 | awk '{print $2 + $4}'`
+	command    = loadCmd + ` &&  ` + freeCmd + `&& ` + connsCmd + ` && ` + procCmd + ` && ` + storageCmd + ` && ` + inodeCmd + ` && ` + uptimeCmd + ` && ` + cpuUtilCmd
 )
 
 var (
