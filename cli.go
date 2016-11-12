@@ -262,8 +262,8 @@ func formatStorage(d *Machine) {
 		err = 90
 	}
 	for _, datum := range d.Storage.Value.([]int32) {
-
-		formatText(string(rune(9601+int(float32(datum)/(12.5)))), getIndividualStorageStatus(datum, warn, err), &s)
+		eight := int(float32(datum) / (12.5))
+		formatText(string(rune(9601+eight)), getSingleStorageStatus(datum, warn, err), &s)
 	}
 	rowToHeader(&s, d.Name, hStorage)
 }

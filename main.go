@@ -35,7 +35,7 @@ func RunOnHost(machine string, forceReConnect bool) {
 		return
 	}
 	wg.Add(1)
-	runOnHost(command, machine, forceReConnect)
+	go runOnHost(command, machine, forceReConnect)
 	wg.Wait()
 }
 
@@ -43,42 +43,41 @@ func RunOnHosts(forceReConnect bool) {
 	for k, _ := range machines {
 		if !machines[k].Fetching {
 			wg.Add(1)
-			runOnHost(command, k, forceReConnect)
+			go runOnHost(command, k, forceReConnect)
 		}
 	}
 	wg.Wait()
 }
 
 func runOnHost(command string, machine string, forceReConnect bool) {
-	go func(key string) {
-		machines[key].Fetching = true
-		var err error
-		var result string
-		if machines[key].client == nil || forceReConnect {
-			machines[key].client, err = gosh.GetClient(*machines[key].config, 15*time.Second)
-		}
-		if machines[key].client != nil {
-			result, err = gosh.RunOnClient(command, *machines[key].client, 15*time.Second)
-			if op, ok := err.(*net.OpError); ok {
-				if !op.Timeout() {
-					machines[key].client = nil
-				}
+	machines[machine].Fetching = true
+	sendRedrawRequest()
+	var err error
+	var result string
+	if machines[machine].client == nil || forceReConnect {
+		machines[machine].client, err = gosh.GetClient(*machines[machine].config, 15*time.Second)
+	}
+	if machines[machine].client != nil {
+		result, err = gosh.RunOnClient(command, *machines[machine].client, 15*time.Second)
+		if op, ok := err.(*net.OpError); ok {
+			if !op.Timeout() {
+				machines[machine].client = nil
 			}
 		}
-		machines[key].Fetching = false
-		if err != nil {
-			machines[key].GotResult = false
-			machines[key].FetchingError = err.Error()
-			machines[key].Status |= StatusUnknown
-		} else {
-			machines[key].GotResult = true
-			populate(machines[key], result)
-			setMachineStatus(machines[key])
-		}
-		formatMachine(key)
-		sendSortingRequest()
-		wg.Done()
-	}(machine)
+	}
+	machines[machine].Fetching = false
+	if err != nil {
+		machines[machine].GotResult = false
+		machines[machine].FetchingError = err.Error()
+		machines[machine].Status |= StatusUnknown
+	} else {
+		machines[machine].GotResult = true
+		populate(machines[machine], result)
+		setMachineStatus(machines[machine])
+	}
+	formatMachine(machine)
+	sendSortingRequest()
+	wg.Done()
 }
 
 func sendSortingRequest() {
@@ -229,12 +228,12 @@ func getStorageStatus(machine *Machine) int {
 	}
 	status := StatusOK
 	for _, value := range machine.Storage.Value.([]int32) {
-		status |= getIndividualStorageStatus(value, warn, err)
+		status |= getSingleStorageStatus(value, warn, err)
 	}
 	return status
 }
 
-func getIndividualStorageStatus(value int32, warn, err float64) int {
+func getSingleStorageStatus(value int32, warn, err float64) int {
 	if value < int32(warn) {
 		return StatusOK
 	} else if value < int32(err) {
@@ -400,6 +399,5 @@ func main() {
 	go redrawRoutine()
 	go sortingRoutine()
 	go updateRoutine()
-	sendSortingRequest()
 	runCli()
 }
