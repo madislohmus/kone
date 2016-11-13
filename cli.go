@@ -49,6 +49,8 @@ var (
 	errorLayerMutex sync.Mutex
 	searchString    string
 	indexFormat     string
+
+	hddFill = []string{"\u25cb", "\u25d4", "\u25d1", "\u25d5", "\u25cf"}
 )
 
 func newStyledText() StyledText {
@@ -262,9 +264,14 @@ func formatStorage(d *Machine) {
 		err = 90
 	}
 	for _, datum := range d.Storage.Value.([]int32) {
-		eight := int(float32(datum) / (12.5))
-		formatText(string(rune(9601+eight)), getSingleStorageStatus(datum, warn, err), &s)
+		if datum < 5 {
+			formatText(hddFill[0], getSingleStorageStatus(datum, warn, err), &s)
+		} else {
+			quarter := int(float32(datum) / (25))
+			formatText(hddFill[quarter+1], getSingleStorageStatus(datum, warn, err), &s)
+		}
 	}
+
 	rowToHeader(&s, d.Name, hStorage)
 }
 
@@ -279,8 +286,12 @@ func formatInode(d *Machine) {
 		err = 90
 	}
 	for _, datum := range d.Inode.Value.([]int32) {
-		eight := int(float32(datum) / (12.5))
-		formatText(string(rune(9601+eight)), getSingleStorageStatus(datum, warn, err), &s)
+		if datum < 5 {
+			formatText(hddFill[0], getSingleStorageStatus(datum, warn, err), &s)
+		} else {
+			quarter := int(float32(datum) / (25))
+			formatText(hddFill[quarter+1], getSingleStorageStatus(datum, warn, err), &s)
+		}
 	}
 	rowToHeader(&s, d.Name, hInode)
 }
