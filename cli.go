@@ -270,11 +270,17 @@ func formatStorage(d *Machine) {
 
 func formatInode(d *Machine) {
 	s := newStyledText()
-	status := getInodeStatus(d)
-	if silent && (status == StatusOK) {
-		appendSilent(&s)
-	} else {
-		formatText(fmt.Sprintf("%3d", d.Inode.Value.(int32)), status, &s)
+	warn, ok := d.Inode.Warning.(float64)
+	if !ok {
+		warn = 80
+	}
+	err, ok := d.Inode.Error.(float64)
+	if !ok {
+		err = 90
+	}
+	for _, datum := range d.Inode.Value.([]int32) {
+		eight := int(float32(datum) / (12.5))
+		formatText(string(rune(9601+eight)), getSingleStorageStatus(datum, warn, err), &s)
 	}
 	rowToHeader(&s, d.Name, hInode)
 }

@@ -20,8 +20,8 @@ const (
 	freeCmd    = `if [ "$(free | grep available)" ]; then free | grep Mem | awk '{print ($2-$7)/$2}'; else free | grep Mem | awk '{print ($3-$6-$7)/$2}'; fi`
 	connsCmd   = `netstat -ant | awk '{print $5}' | uniq -u | wc -l`
 	procCmd    = `nproc`
-	storageCmd = `df -x tmpfs | grep '/' | awk '{print $5}' | sort -g | awk '{printf "%s ",$0} END {print " "}'`
-	inodeCmd   = `df -i / | grep '/' | awk '{print $5}'`
+	storageCmd = `df -x tmpfs -x none | grep '/' | grep '%' | awk '{print $6 "=" $5}' | sort -g | awk '{printf "%s ",$0} END {print " "}'`
+	inodeCmd   = `df -i -x tmpfs -x none | grep '/' | grep '%' | awk '{print $6 "=" $5}' | sort -g | awk '{printf "%s ",$0} END {print " "}'`
 	uptimeCmd  = `cat /proc/uptime | awk '{print $1}'`
 	cpuUtilCmd = `top -b -n2 | grep "Cpu(s)"| tail -n 1 | awk '{print $2 + $4}'`
 	command    = loadCmd + ` &&  ` + freeCmd + `&& ` + connsCmd + ` && ` + procCmd + ` && ` + storageCmd + ` && ` + inodeCmd + ` && ` + uptimeCmd + ` && ` + cpuUtilCmd
@@ -145,7 +145,7 @@ func populate(machines *Machine, result string) {
 	driveUsages := strings.Split(strings.TrimSpace(s[4]), " ")
 	drives := []int32{}
 	for _, usage := range driveUsages {
-		stor, err := strconv.ParseInt(strings.TrimRight(usage, "%"), 10, 32)
+		stor, err := strconv.ParseInt(strings.TrimRight(strings.Split(usage, "=")[1], "%"), 10, 32)
 		if err != nil {
 			stor = -1
 		}
@@ -153,11 +153,16 @@ func populate(machines *Machine, result string) {
 	}
 	machines.Storage.Value = drives
 
-	inode, err := strconv.ParseInt(strings.TrimRight(s[5], "%"), 10, 32)
-	if err != nil {
-		inode = -1
+	inodeUsages := strings.Split(strings.TrimSpace(s[5]), " ")
+	inodes := []int32{}
+	for _, usage := range inodeUsages {
+		stor, err := strconv.ParseInt(strings.TrimRight(strings.Split(usage, "=")[1], "%"), 10, 32)
+		if err != nil {
+			stor = -1
+		}
+		inodes = append(inodes, int32(stor))
 	}
-	machines.Inode.Value = int32(inode)
+	machines.Inode.Value = inodes
 
 	ut, err := strconv.ParseFloat(s[6], 10)
 	if err != nil {
@@ -251,7 +256,6 @@ func getSingleStorageStatus(value int32, warn, err float64) int {
 }
 
 func getInodeStatus(machine *Machine) int {
-	inode := machine.Inode.Value.(int32)
 	warn, ok := machine.Inode.Warning.(float64)
 	if !ok {
 		warn = 80
@@ -260,12 +264,11 @@ func getInodeStatus(machine *Machine) int {
 	if !ok {
 		err = 90
 	}
-	if inode < int32(warn) {
-		return StatusOK
-	} else if inode < int32(err) {
-		return StatusWarning
+	status := StatusOK
+	for _, value := range machine.Inode.Value.([]int32) {
+		status |= getSingleStorageStatus(value, warn, err)
 	}
-	return StatusError
+	return status
 }
 
 func getConnectionsStatus(machine *Machine) int {
