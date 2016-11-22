@@ -47,6 +47,7 @@ var (
 	selectedFg = termbox.ColorWhite | termbox.AttrBold
 
 	errorLayerMutex sync.Mutex
+	redrawMutex     sync.Mutex
 	searchString    string
 	indexFormat     string
 
@@ -268,6 +269,9 @@ func formatStorage(d *Machine) {
 			formatText(hddFill[0], getSingleStorageStatus(datum, warn, err), &s)
 		} else {
 			quarter := int(float32(datum) / (25))
+			if quarter == 4 {
+				quarter = 3
+			}
 			formatText(hddFill[quarter+1], getSingleStorageStatus(datum, warn, err), &s)
 		}
 	}
@@ -757,7 +761,9 @@ func redrawRoutine() {
 		for len(redrawRequestChannel) > 0 {
 			<-redrawRequestChannel
 		}
+		redrawMutex.Lock()
 		redraw()
+		redrawMutex.Unlock()
 	}
 }
 
