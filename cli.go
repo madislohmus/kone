@@ -179,8 +179,8 @@ func formatName(d *Machine) {
 	}
 	idx := strings.Index(strings.ToLower(name), strings.ToLower(searchString))
 	if idx > -1 {
-		if !matchingMachines[name] {
-			matchingMachines[name] = true
+		if !matchingMachines[d.Name] {
+			matchingMachines[d.Name] = true
 			matchingCount += 1
 		}
 	}
