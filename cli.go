@@ -46,10 +46,11 @@ var (
 	selectedBg = termbox.ColorBlack | termbox.AttrBold
 	selectedFg = termbox.ColorWhite | termbox.AttrBold
 
-	errorLayerMutex sync.Mutex
-	redrawMutex     sync.Mutex
-	searchString    string
-	indexFormat     string
+	errorLayerMutex  sync.Mutex
+	redrawMutex      sync.Mutex
+	columnWidthMutex sync.Mutex
+	searchString     string
+	indexFormat      string
 
 	hddFill = []string{"\u25cb", "\u25d4", "\u25d1", "\u25d5", "\u25cf"}
 )
@@ -66,7 +67,7 @@ func Init(m map[string]*Machine) {
 	tic.ColumnWidth = make(map[string]int)
 	headerToIndex = make(map[string]int)
 	for i, h := range tic.Header {
-		tic.ColumnWidth[h] = len(h)
+		putToColumnWidthMap(h, len(h))
 		headerToIndex[h] = i
 	}
 	tic.ColumnAlignment = map[string]Alignment{
@@ -83,8 +84,8 @@ func Init(m map[string]*Machine) {
 	}
 	for k, _ := range m {
 		tic.Data[k] = make([]StyledText, len(tic.Header))
-		if len(k) > tic.ColumnWidth[hMachine] {
-			tic.ColumnWidth[hMachine] = len(k)
+		if len(k) > getFromColumnWidthMap(hMachine) {
+			putToColumnWidthMap(hMachine, len(k))
 		}
 		matchingMachines[k] = false
 	}
@@ -165,8 +166,8 @@ func appendNoData(s *StyledText) {
 
 func rowToHeader(s *StyledText, machine string, header string) {
 	tic.Data[machine][headerToIndex[header]] = *s
-	if len(s.Runes) > tic.ColumnWidth[header] {
-		tic.ColumnWidth[header] = len(s.Runes)
+	if len(s.Runes) > getFromColumnWidthMap(header) {
+		putToColumnWidthMap(header, len(s.Runes))
 		sendRedrawRequest()
 	}
 }
@@ -175,7 +176,7 @@ func formatName(d *Machine) {
 	s := newStyledText()
 	name := d.Name
 	if showIPs {
-		name = d.config.Host
+		name = name + " (" + d.config.Host + ")"
 	}
 	idx := strings.Index(strings.ToLower(name), strings.ToLower(searchString))
 	if idx > -1 {
@@ -355,21 +356,21 @@ func drawHeader() {
 	for _, h := range tic.Header {
 		position := currentTab
 		if tic.ColumnAlignment[h] == AlignCentre {
-			position += ((tic.ColumnWidth[h] - len(h)) / 2)
+			position += ((getFromColumnWidthMap(h) - len(h)) / 2)
 		} else if tic.ColumnAlignment[h] == AlignRight {
-			position += (tic.ColumnWidth[h] - len(h))
+			position += (getFromColumnWidthMap(h) - len(h))
 		}
 		for j, r := range h {
 			termbox.SetCell(3+position+j, headerRow, r, 9|termbox.AttrBold, termbox.ColorDefault)
 		}
-		currentTab += tic.ColumnWidth[h] + 1
+		currentTab += getFromColumnWidthMap(h) + 1
 	}
 }
 
 func drawDate() {
 	w := 1
 	for _, h := range tic.Header {
-		w += tic.ColumnWidth[h] + 1
+		w += getFromColumnWidthMap(h) + 1
 	}
 	d := fetchTime.Format(time.RFC1123)
 	for j, r := range d {
@@ -445,9 +446,9 @@ func drawAtIndex(i int, name string, flush bool) {
 		position := currentTab
 		s := tic.Data[name][heidx]
 		if tic.ColumnAlignment[he] == AlignCentre {
-			position += ((tic.ColumnWidth[he] - len(s.Runes)) / 2)
+			position += ((getFromColumnWidthMap(he) - len(s.Runes)) / 2)
 		} else if tic.ColumnAlignment[he] == AlignRight {
-			position += (tic.ColumnWidth[he] - len(s.Runes))
+			position += (getFromColumnWidthMap(he) - len(s.Runes))
 		}
 		for j := 0; j < len(s.Runes); j++ {
 			fg := s.FG[j]
@@ -460,7 +461,7 @@ func drawAtIndex(i int, name string, flush bool) {
 			}
 			termbox.SetCell(position+j, row, s.Runes[j], fg, bg)
 		}
-		currentTab += tic.ColumnWidth[he] + 1
+		currentTab += getFromColumnWidthMap(he) + 1
 	}
 
 	errorLayerMutex.Lock()
@@ -474,7 +475,7 @@ func drawAtIndex(i int, name string, flush bool) {
 			label = "E"
 		}
 		for j, r := range label {
-			termbox.SetCell(len(index)+tic.ColumnWidth[hMachine]+j+3, row, r, fg, bg)
+			termbox.SetCell(len(index)+getFromColumnWidthMap(hMachine)+j+3, row, r, fg, bg)
 		}
 	}
 	errorLayerMutex.Unlock()
@@ -664,6 +665,19 @@ func handleKeyPressInSearch(r rune) {
 	}
 }
 
+func getFromColumnWidthMap(key string) int {
+	columnWidthMutex.Lock()
+	val := tic.ColumnWidth[key]
+	columnWidthMutex.Unlock()
+	return val
+}
+
+func putToColumnWidthMap(key string, value int) {
+	columnWidthMutex.Lock()
+	tic.ColumnWidth[key] = value
+	columnWidthMutex.Unlock()
+}
+
 func keyLoop() {
 loop:
 	for {
@@ -741,6 +755,9 @@ loop:
 					formatAll()
 				case 105: // i
 					showIPs = !showIPs
+					for _, h := range tic.Header {
+						putToColumnWidthMap(h, len(h))
+					}
 					formatAll()
 				}
 				sendRedrawRequest()
