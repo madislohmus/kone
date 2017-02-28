@@ -17,15 +17,21 @@ const (
 	dataStartRow = 4
 
 	hMachine = "Machine"
-	hLoad1   = "l1"
-	hLoad5   = "l5"
-	hLoad15  = "l15"
+	hLoad    = "load"
 	hCPU     = "CPU"
 	hFree    = "free"
 	hStorage = "storage"
 	hInode   = "inode"
 	hCons    = "conns"
 	hUptime  = "uptime"
+
+	hLoadCompact    = "l"
+	hCPUCompact     = "C"
+	hFreeCompact    = "f"
+	hStorageCompact = "s"
+	hInodeCompact   = "i"
+	hConnsCompact   = "c"
+	hUptimeCompact  = "u"
 )
 
 var (
@@ -52,7 +58,10 @@ var (
 	searchString     string
 	indexFormat      string
 
-	hddFill = []string{"\u25cb", "\u25d4", "\u25d1", "\u25d5", "\u25cf"}
+	smallCircle = '\u00b7'
+	hddFill     = []string{"\u25cb", "\u25d4", "\u25d1", "\u25d5", "\u25cf"}
+
+	compactHeader = []string{hMachine, hLoadCompact, hCPUCompact, hFreeCompact, hStorageCompact, hInodeCompact, hConnsCompact, hUptimeCompact}
 )
 
 func newStyledText() StyledText {
@@ -62,19 +71,21 @@ func newStyledText() StyledText {
 func Init(m map[string]*Machine) {
 	tic = TextInColumns{}
 	errorLayer = make(map[string]string)
-	tic.Header = []string{hMachine, hLoad1, hLoad5, hLoad15, hCPU, hFree, hStorage, hInode, hCons, hUptime}
+	tic.Header = []string{hMachine, hLoad, hCPU, hFree, hStorage, hInode, hCons, hUptime}
 	tic.Data = make(map[string][]StyledText)
 	tic.ColumnWidth = make(map[string]int)
 	headerToIndex = make(map[string]int)
 	for i, h := range tic.Header {
-		putToColumnWidthMap(h, len(h))
+		name := h
+		if silent {
+			name = compactHeader[i]
+		}
+		putToColumnWidthMap(h, len(name))
 		headerToIndex[h] = i
 	}
 	tic.ColumnAlignment = map[string]Alignment{
 		hMachine: AlignRight,
-		hLoad1:   AlignRight,
-		hLoad5:   AlignRight,
-		hLoad15:  AlignRight,
+		hLoad:    AlignRight,
 		hCPU:     AlignRight,
 		hFree:    AlignRight,
 		hStorage: AlignRight,
@@ -123,7 +134,7 @@ func formatAll() {
 func formatMachine(machine string) {
 	d := machines[machine]
 	if d.GotResult {
-		formatLoads(d)
+		formatLoad(d)
 		formatCPU(d)
 		formatFree(d)
 		formatStorage(d)
@@ -153,7 +164,7 @@ func clearInfo(machine string) {
 }
 
 func appendSilent(s *StyledText) {
-	s.Runes = append(s.Runes, '\u00b7')
+	s.Runes = append(s.Runes, smallCircle)
 	s.FG = append(s.FG, 9)
 	s.BG = append(s.BG, termbox.ColorDefault)
 }
@@ -211,21 +222,22 @@ func formatName(d *Machine) {
 	rowToHeader(&s, d.Name, hMachine)
 }
 
-func formatLoads(d *Machine) {
-	rowToHeader(formatLoad(d.Load1, d), d.Name, hLoad1)
-	rowToHeader(formatLoad(d.Load5, d), d.Name, hLoad5)
-	rowToHeader(formatLoad(d.Load15, d), d.Name, hLoad15)
-}
-
-func formatLoad(load Measurement, d *Machine) *StyledText {
+func formatLoad(d *Machine) {
 	s := newStyledText()
-	status := getLoadStatus(d, load)
-	if silent && (status == StatusOK) {
-		appendSilent(&s)
-	} else {
-		formatText(fmt.Sprintf("%.2f", load.Value.(float32)), status, &s)
+	loads := []Measurement{d.Load1, d.Load5, d.Load15}
+	for i, load := range loads {
+		status := getLoadStatus(d, load)
+		if silent && (status == StatusOK) {
+			appendSilent(&s)
+		} else {
+			formatStr := "%.2f"
+			if i+1 < len(loads) {
+				formatStr += " "
+			}
+			formatText(fmt.Sprintf(formatStr, load.Value.(float32)), status, &s)
+		}
 	}
-	return &s
+	rowToHeader(&s, d.Name, hLoad)
 }
 
 func formatCPU(d *Machine) {
@@ -266,14 +278,11 @@ func formatStorage(d *Machine) {
 		err = 90
 	}
 	for _, datum := range d.Storage.Value.([]int32) {
-		if datum < 5 {
-			formatText(hddFill[0], getSingleStorageStatus(datum, warn, err), &s)
+		status := getSingleStorageStatus(datum, warn, err)
+		if silent && (status == StatusOK) {
+			appendSilent(&s)
 		} else {
-			quarter := int(float32(datum) / (25))
-			if quarter == 4 {
-				quarter = 3
-			}
-			formatText(hddFill[quarter+1], getSingleStorageStatus(datum, warn, err), &s)
+			formatText(fmt.Sprintf("%3d", datum), status, &s)
 		}
 	}
 
@@ -291,11 +300,11 @@ func formatInode(d *Machine) {
 		err = 90
 	}
 	for _, datum := range d.Inode.Value.([]int32) {
-		if datum < 5 {
-			formatText(hddFill[0], getSingleStorageStatus(datum, warn, err), &s)
+		status := getSingleStorageStatus(datum, warn, err)
+		if silent && (status == StatusOK) {
+			appendSilent(&s)
 		} else {
-			quarter := int(float32(datum) / (25))
-			formatText(hddFill[quarter+1], getSingleStorageStatus(datum, warn, err), &s)
+			formatText(fmt.Sprintf("%3d", datum), status, &s)
 		}
 	}
 	rowToHeader(&s, d.Name, hInode)
@@ -353,14 +362,18 @@ func formatText(text string, status int, s *StyledText) {
 
 func drawHeader() {
 	currentTab := 1
-	for _, h := range tic.Header {
+	for i, h := range tic.Header {
 		position := currentTab
-		if tic.ColumnAlignment[h] == AlignCentre {
-			position += ((getFromColumnWidthMap(h) - len(h)) / 2)
-		} else if tic.ColumnAlignment[h] == AlignRight {
-			position += (getFromColumnWidthMap(h) - len(h))
+		name := h
+		if silent {
+			name = compactHeader[i]
 		}
-		for j, r := range h {
+		if tic.ColumnAlignment[h] == AlignCentre {
+			position += ((getFromColumnWidthMap(h) - len(name)) / 2)
+		} else if tic.ColumnAlignment[h] == AlignRight {
+			position += (getFromColumnWidthMap(h) - len(name))
+		}
+		for j, r := range name {
 			termbox.SetCell(3+position+j, headerRow, r, 9|termbox.AttrBold, termbox.ColorDefault)
 		}
 		currentTab += getFromColumnWidthMap(h) + 1
@@ -750,13 +763,24 @@ loop:
 				switch ev.Ch {
 				case 102: // f
 					forceReConnect = !forceReConnect
-				case 115: // s
+				case 115: // s - silent
 					silent = !silent
+					for i, h := range tic.Header {
+						l := len(h)
+						if silent {
+							l = len(compactHeader[i])
+						}
+						putToColumnWidthMap(h, l)
+					}
 					formatAll()
-				case 105: // i
+				case 105: // i - show IP-s
 					showIPs = !showIPs
-					for _, h := range tic.Header {
-						putToColumnWidthMap(h, len(h))
+					for i, h := range tic.Header {
+						l := len(h)
+						if silent {
+							l = len(compactHeader[i])
+						}
+						putToColumnWidthMap(h, l)
 					}
 					formatAll()
 				}
