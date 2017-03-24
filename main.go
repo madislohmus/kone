@@ -15,16 +15,23 @@ import (
 	"golang.org/x/crypto/ssh"
 )
 
+type (
+	consulCheck struct {
+		Status string `json:"Status"`
+	}
+)
+
 const (
-	loadCmd    = `cat /proc/loadavg | awk '{print $1,$2,$3}'`
-	freeCmd    = `if [ "$(free | grep available)" ]; then free | grep Mem | awk '{print ($2-$7)/$2}'; else free | grep Mem | awk '{print ($3-$6-$7)/$2}'; fi`
-	connsCmd   = `netstat -ant | awk '{print $5}' | uniq -u | wc -l`
-	procCmd    = `nproc`
-	storageCmd = `df -x tmpfs -x none | grep '/' | grep '%' | awk '{print $6 "=" $5}' | sort -g | awk '{printf "%s ",$0} END {print " "}'`
-	inodeCmd   = `df -i -x tmpfs -x none | grep '/' | grep '%' | awk '{print $6 "=" $5}' | sort -g | awk '{printf "%s ",$0} END {print " "}'`
-	uptimeCmd  = `cat /proc/uptime | awk '{print $1}'`
-	cpuUtilCmd = `top -b -n2 | grep "Cpu(s)"| tail -n 1 | awk '{print $2 + $4}'`
-	command    = loadCmd + ` &&  ` + freeCmd + `&& ` + connsCmd + ` && ` + procCmd + ` && ` + storageCmd + ` && ` + inodeCmd + ` && ` + uptimeCmd + ` && ` + cpuUtilCmd
+	loadCmd        = `cat /proc/loadavg | awk '{print $1,$2,$3}'`
+	freeCmd        = `if [ "$(free | grep available)" ]; then free | grep Mem | awk '{print ($2-$7)/$2}'; else free | grep Mem | awk '{print ($3-$6-$7)/$2}'; fi`
+	connsCmd       = `netstat -ant | awk '{print $5}' | uniq -u | wc -l`
+	procCmd        = `nproc`
+	storageCmd     = `df -x tmpfs -x none | grep '/' | grep '%' | awk '{print $6 "=" $5}' | sort -g | awk '{printf "%s ",$0} END {print " "}'`
+	inodeCmd       = `df -i -x tmpfs -x none | grep '/' | grep '%' | awk '{print $6 "=" $5}' | sort -g | awk '{printf "%s ",$0} END {print " "}'`
+	uptimeCmd      = `cat /proc/uptime | awk '{print $1}'`
+	cpuUtilCmd     = `top -b -n2 | grep "Cpu(s)"| tail -n 1 | awk '{print $2 + $4}'`
+	consulServices = `curl -s http://localhost:8500/v1/health/node/$(hostname)`
+	command        = loadCmd + ` &&  ` + freeCmd + `&& ` + connsCmd + ` && ` + procCmd + ` && ` + storageCmd + ` && ` + inodeCmd + ` && ` + uptimeCmd + ` && ` + cpuUtilCmd + `&&` + consulServices
 )
 
 var (
@@ -176,6 +183,29 @@ func populate(machines *Machine, result string) {
 	}
 	machines.CPU.Value = float32(cpu)
 
+	consulChecks := strings.TrimSpace(s[8])
+	if len(consulChecks) > 0 {
+		var checks []consulCheck
+		err := json.Unmarshal([]byte(consulChecks), &checks)
+		if err == nil {
+			checkArray := [4]int32{}
+			for _, check := range checks {
+				switch check.Status {
+				case "passing":
+					checkArray[0]++
+				case "unknown":
+					checkArray[1]++
+				case "warning":
+					checkArray[2]++
+				case "critical":
+					fallthrough
+				default:
+					checkArray[3]++
+				}
+			}
+			machines.Services.Value = checkArray
+		}
+	}
 }
 
 func setMachineStatus(machine *Machine) {
@@ -191,6 +221,7 @@ func setMachineStatus(machine *Machine) {
 	machine.Status |= getInodeStatus(machine)
 	machine.Status |= getConnectionsStatus(machine)
 	machine.Status |= getUptimeStatus(machine)
+	machine.Status |= getServicesStatus(machine)
 
 }
 
@@ -324,6 +355,20 @@ func getUptimeStatus(machine *Machine) int {
 		return StatusWarning
 	}
 	return StatusError
+}
+
+func getServicesStatus(machine *Machine) int {
+	if machine.Services.Value != nil {
+		checks := machine.Services.Value.([4]int32)
+		if checks[3] > 0 {
+			return StatusError
+		} else if checks[2] > 0 {
+			return StatusWarning
+		} else if checks[1] > 0 {
+			return StatusUnknown
+		}
+	}
+	return StatusOK
 }
 
 func getPassword() ([]byte, error) {

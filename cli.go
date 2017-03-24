@@ -16,22 +16,24 @@ const (
 	dateRow      = 1
 	dataStartRow = 4
 
-	hMachine = "Machine"
-	hLoad    = "load"
-	hCPU     = "CPU"
-	hFree    = "free"
-	hStorage = "storage"
-	hInode   = "inode"
-	hCons    = "conns"
-	hUptime  = "uptime"
+	hMachine  = "Machine"
+	hLoad     = "load"
+	hCPU      = "CPU"
+	hFree     = "free"
+	hStorage  = "storage"
+	hInode    = "inode"
+	hCons     = "conns"
+	hUptime   = "uptime"
+	hServices = "services"
 
-	hLoadCompact    = "l"
-	hCPUCompact     = "C"
-	hFreeCompact    = "f"
-	hStorageCompact = "s"
-	hInodeCompact   = "i"
-	hConnsCompact   = "c"
-	hUptimeCompact  = "u"
+	hLoadCompact     = "l"
+	hCPUCompact      = "C"
+	hFreeCompact     = "f"
+	hStorageCompact  = "S"
+	hInodeCompact    = "i"
+	hConnsCompact    = "c"
+	hUptimeCompact   = "u"
+	hServicesCompact = "s"
 )
 
 var (
@@ -61,7 +63,7 @@ var (
 	smallCircle = '\u00b7'
 	hddFill     = []string{"\u25cb", "\u25d4", "\u25d1", "\u25d5", "\u25cf"}
 
-	compactHeader = []string{hMachine, hLoadCompact, hCPUCompact, hFreeCompact, hStorageCompact, hInodeCompact, hConnsCompact, hUptimeCompact}
+	compactHeader = []string{hMachine, hLoadCompact, hCPUCompact, hFreeCompact, hStorageCompact, hInodeCompact, hConnsCompact, hUptimeCompact, hServicesCompact}
 )
 
 func newStyledText() StyledText {
@@ -71,7 +73,7 @@ func newStyledText() StyledText {
 func Init(m map[string]*Machine) {
 	tic = TextInColumns{}
 	errorLayer = make(map[string]string)
-	tic.Header = []string{hMachine, hLoad, hCPU, hFree, hStorage, hInode, hCons, hUptime}
+	tic.Header = []string{hMachine, hLoad, hCPU, hFree, hStorage, hInode, hCons, hUptime, hServices}
 	tic.Data = make(map[string][]StyledText)
 	tic.ColumnWidth = make(map[string]int)
 	headerToIndex = make(map[string]int)
@@ -84,14 +86,15 @@ func Init(m map[string]*Machine) {
 		headerToIndex[h] = i
 	}
 	tic.ColumnAlignment = map[string]Alignment{
-		hMachine: AlignRight,
-		hLoad:    AlignRight,
-		hCPU:     AlignRight,
-		hFree:    AlignRight,
-		hStorage: AlignRight,
-		hInode:   AlignRight,
-		hCons:    AlignRight,
-		hUptime:  AlignRight,
+		hMachine:  AlignRight,
+		hLoad:     AlignCentre,
+		hCPU:      AlignRight,
+		hFree:     AlignRight,
+		hStorage:  AlignRight,
+		hInode:    AlignRight,
+		hCons:     AlignRight,
+		hUptime:   AlignRight,
+		hServices: AlignLeft,
 	}
 	for k, _ := range m {
 		tic.Data[k] = make([]StyledText, len(tic.Header))
@@ -141,6 +144,7 @@ func formatMachine(machine string) {
 		formatInode(d)
 		formatCons(d)
 		formatUptime(d)
+		formatServices(d)
 		errorLayerMutex.Lock()
 		delete(errorLayer, machine)
 		errorLayerMutex.Unlock()
@@ -229,6 +233,12 @@ func formatLoad(d *Machine) {
 		status := getLoadStatus(d, load)
 		if silent && (status == StatusOK) {
 			appendSilent(&s)
+			width := getFromColumnWidthMap(hLoad)
+			for i := 0; i < int(width/4); i++ {
+				s.Runes = append(s.Runes, ' ')
+				s.FG = append(s.FG, 9)
+				s.BG = append(s.BG, termbox.ColorDefault)
+			}
 		} else {
 			formatStr := "%.2f"
 			if i+1 < len(loads) {
@@ -344,6 +354,34 @@ func formatUptime(d *Machine) {
 		}
 	}
 	rowToHeader(&s, d.Name, hUptime)
+}
+
+func formatServices(d *Machine) {
+	s := newStyledText()
+	if d.Services.Value != nil {
+		statuses := [4]int{StatusOK, StatusUnknown, StatusWarning, StatusError}
+		status := getServicesStatus(d)
+		for i, datum := range d.Services.Value.([4]int32) {
+			if silent && (status == StatusOK) {
+				appendSilent(&s)
+			} else {
+				if datum == 0 {
+					for _, r := range " 0" {
+						s.Runes = append(s.Runes, r)
+						s.FG = append(s.FG, 9)
+						s.BG = append(s.BG, termbox.ColorDefault)
+					}
+				} else {
+					formatText(fmt.Sprintf("%2d", datum), statuses[i], &s)
+				}
+			}
+		}
+	} else {
+		s.Runes = append(s.Runes, ' ')
+		s.FG = append(s.FG, termbox.ColorDefault)
+		s.BG = append(s.BG, termbox.ColorDefault)
+	}
+	rowToHeader(&s, d.Name, hServices)
 }
 
 func formatText(text string, status int, s *StyledText) {

@@ -44,6 +44,7 @@ type (
 		Inode         Measurement `json:"inode"`
 		Connections   Measurement `json:"conns"`
 		Uptime        Measurement `json:"utime"`
+		Services      Measurement `json:"services"`
 		Nproc         int32       `json:"nproc"`
 		Fetching      bool
 		GotResult     bool
