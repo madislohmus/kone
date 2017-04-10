@@ -306,11 +306,11 @@ func getConnectionsStatus(machine *Machine) int {
 	conns := machine.Connections.Value.(int32)
 	warn, ok := machine.Connections.Warning.(float64)
 	if !ok {
-		warn = 10000
+		warn = 52429
 	}
 	err, ok := machine.Connections.Error.(float64)
 	if !ok {
-		err = 50000
+		err = 58982
 	}
 	if conns < int32(warn) {
 		return StatusOK

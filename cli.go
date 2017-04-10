@@ -360,9 +360,8 @@ func formatServices(d *Machine) {
 	s := newStyledText()
 	if d.Services.Value != nil {
 		statuses := [4]int{StatusOK, StatusUnknown, StatusWarning, StatusError}
-		status := getServicesStatus(d)
 		for i, datum := range d.Services.Value.([4]int32) {
-			if silent && (status == StatusOK) {
+			if silent && (i == 0 || datum == 0) {
 				appendSilent(&s)
 			} else {
 				if datum == 0 {
