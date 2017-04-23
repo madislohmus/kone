@@ -96,7 +96,7 @@ func Init(m map[string]*Machine) {
 		hUptime:   AlignRight,
 		hServices: AlignLeft,
 	}
-	for k, _ := range m {
+	for k := range m {
 		tic.Data[k] = make([]StyledText, len(tic.Header))
 		if len(k) > getFromColumnWidthMap(hMachine) {
 			putToColumnWidthMap(hMachine, len(k))
@@ -707,7 +707,7 @@ func handleKeyPressInSearch(r rune) {
 		searchString += string(r)
 		cursorPosition = 0
 		matchingCount = 0
-		for k, _ := range matchingMachines {
+		for k := range matchingMachines {
 			matchingMachines[k] = false
 		}
 		formatAll()

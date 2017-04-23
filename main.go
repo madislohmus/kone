@@ -55,7 +55,7 @@ func RunOnHost(machine string, forceReConnect bool) {
 }
 
 func RunOnHosts(forceReConnect bool) {
-	for k, _ := range machines {
+	for k := range machines {
 		if !machines[k].Fetching {
 			wg.Add(1)
 			go runOnHost(command, k, forceReConnect)
@@ -446,7 +446,7 @@ func main() {
 	}
 	Init(machines)
 	sorter = Sorter{keyToIndex: make(map[string]int)}
-	for k, _ := range machines {
+	for k := range machines {
 		sorter.keys = append(sorter.keys, k)
 		formatMachine(k)
 	}
