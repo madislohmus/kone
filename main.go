@@ -36,35 +36,35 @@ const (
 
 var (
 	wg                   sync.WaitGroup
-	machines             map[string]*Machine
+	machines             map[string]*machine
 	signer               *ssh.Signer
-	sorter               Sorter
+	sorter               machineSorter
 	running              bool
 	fetchTime            time.Time
 	sortRequestChannel   chan bool
 	redrawRequestChannel chan bool
 )
 
-func RunOnHost(machine string, forceReConnect bool) {
+func runOnHost(machine string, forceReConnect bool) {
 	if machines[machine].Fetching {
 		return
 	}
 	wg.Add(1)
-	go runOnHost(command, machine, forceReConnect)
+	go runCommandOnHost(command, machine, forceReConnect)
 	wg.Wait()
 }
 
-func RunOnHosts(forceReConnect bool) {
+func runOnHosts(forceReConnect bool) {
 	for k := range machines {
 		if !machines[k].Fetching {
 			wg.Add(1)
-			go runOnHost(command, k, forceReConnect)
+			go runCommandOnHost(command, k, forceReConnect)
 		}
 	}
 	wg.Wait()
 }
 
-func runOnHost(command string, machine string, forceReConnect bool) {
+func runCommandOnHost(command string, machine string, forceReConnect bool) {
 	machines[machine].Fetching = true
 	sendRedrawRequest()
 	var err error
@@ -84,7 +84,7 @@ func runOnHost(command string, machine string, forceReConnect bool) {
 	if err != nil {
 		machines[machine].GotResult = false
 		machines[machine].FetchingError = err.Error()
-		machines[machine].Status |= StatusUnknown
+		machines[machine].Status |= statusUnknown
 	} else {
 		machines[machine].GotResult = true
 		populate(machines[machine], result)
@@ -110,7 +110,7 @@ func sortingRoutine() {
 	}
 }
 
-func populate(machines *Machine, result string) {
+func populate(machines *machine, result string) {
 	s := strings.Split(result, "\n")
 	loads := strings.Split(s[0], " ")
 	l1, err := strconv.ParseFloat(loads[0], 32)
@@ -208,9 +208,9 @@ func populate(machines *Machine, result string) {
 	}
 }
 
-func setMachineStatus(machine *Machine) {
+func setMachineStatus(machine *machine) {
 
-	machine.Status = StatusOK
+	machine.Status = statusOK
 
 	machine.Status |= getLoadStatus(machine, machine.Load1)
 	machine.Status |= getLoadStatus(machine, machine.Load5)
@@ -225,7 +225,7 @@ func setMachineStatus(machine *Machine) {
 
 }
 
-func getCPUStatus(machine *Machine) int {
+func getCPUStatus(machine *machine) int {
 	cpu := machine.CPU.Value.(float32)
 	warn, ok := machine.CPU.Warning.(float64)
 	if !ok {
@@ -236,14 +236,14 @@ func getCPUStatus(machine *Machine) int {
 		err = 90
 	}
 	if cpu < float32(warn)*(float32(machine.Nproc)) {
-		return StatusOK
+		return statusOK
 	} else if cpu < float32(err)*(float32(machine.Nproc)) {
-		return StatusWarning
+		return statusWarning
 	}
-	return StatusError
+	return statusError
 }
 
-func getFreeStatus(machine *Machine) int {
+func getFreeStatus(machine *machine) int {
 	free := machine.Free.Value.(float32)
 	warn, ok := machine.Free.Warning.(float64)
 	if !ok {
@@ -254,14 +254,14 @@ func getFreeStatus(machine *Machine) int {
 		err = 0.9
 	}
 	if free < float32(warn) {
-		return StatusOK
+		return statusOK
 	} else if free < float32(err) {
-		return StatusWarning
+		return statusWarning
 	}
-	return StatusError
+	return statusError
 }
 
-func getStorageStatus(machine *Machine) int {
+func getStorageStatus(machine *machine) int {
 	warn, ok := machine.Storage.Warning.(float64)
 	if !ok {
 		warn = 80
@@ -270,7 +270,7 @@ func getStorageStatus(machine *Machine) int {
 	if !ok {
 		err = 90
 	}
-	status := StatusOK
+	status := statusOK
 	for _, value := range machine.Storage.Value.([]int32) {
 		status |= getSingleStorageStatus(value, warn, err)
 	}
@@ -279,14 +279,14 @@ func getStorageStatus(machine *Machine) int {
 
 func getSingleStorageStatus(value int32, warn, err float64) int {
 	if value < int32(warn) {
-		return StatusOK
+		return statusOK
 	} else if value < int32(err) {
-		return StatusWarning
+		return statusWarning
 	}
-	return StatusError
+	return statusError
 }
 
-func getInodeStatus(machine *Machine) int {
+func getInodeStatus(machine *machine) int {
 	warn, ok := machine.Inode.Warning.(float64)
 	if !ok {
 		warn = 80
@@ -295,14 +295,14 @@ func getInodeStatus(machine *Machine) int {
 	if !ok {
 		err = 90
 	}
-	status := StatusOK
+	status := statusOK
 	for _, value := range machine.Inode.Value.([]int32) {
 		status |= getSingleStorageStatus(value, warn, err)
 	}
 	return status
 }
 
-func getConnectionsStatus(machine *Machine) int {
+func getConnectionsStatus(machine *machine) int {
 	conns := machine.Connections.Value.(int32)
 	warn, ok := machine.Connections.Warning.(float64)
 	if !ok {
@@ -313,14 +313,14 @@ func getConnectionsStatus(machine *Machine) int {
 		err = 58982
 	}
 	if conns < int32(warn) {
-		return StatusOK
+		return statusOK
 	} else if conns < int32(err) {
-		return StatusWarning
+		return statusWarning
 	}
-	return StatusError
+	return statusError
 }
 
-func getLoadStatus(machine *Machine, load Measurement) int {
+func getLoadStatus(machine *machine, load measurement) int {
 	l := load.Value.(float32)
 	nproc := machine.Nproc
 	warn, ok := load.Warning.(float64)
@@ -332,14 +332,14 @@ func getLoadStatus(machine *Machine, load Measurement) int {
 		err = float64(nproc)
 	}
 	if l < float32(warn) {
-		return StatusOK
+		return statusOK
 	} else if l < float32(err) {
-		return StatusWarning
+		return statusWarning
 	}
-	return StatusError
+	return statusError
 }
 
-func getUptimeStatus(machine *Machine) int {
+func getUptimeStatus(machine *machine) int {
 	ut := machine.Uptime.Value.(int64)
 	warn, ok := machine.Uptime.Warning.(float64)
 	if !ok {
@@ -350,25 +350,25 @@ func getUptimeStatus(machine *Machine) int {
 		err = 100 * 24 * 60 * 60
 	}
 	if ut < int64(warn) {
-		return StatusOK
+		return statusOK
 	} else if ut < int64(err) {
-		return StatusWarning
+		return statusWarning
 	}
-	return StatusError
+	return statusError
 }
 
-func getServicesStatus(machine *Machine) int {
+func getServicesStatus(machine *machine) int {
 	if machine.Services.Value != nil {
 		checks := machine.Services.Value.([4]int32)
 		if checks[3] > 0 {
-			return StatusError
+			return statusError
 		} else if checks[2] > 0 {
-			return StatusWarning
+			return statusWarning
 		} else if checks[1] > 0 {
-			return StatusUnknown
+			return statusUnknown
 		}
 	}
-	return StatusOK
+	return statusOK
 }
 
 func getPassword() ([]byte, error) {
@@ -387,8 +387,8 @@ func populateMachines() error {
 	if err != nil {
 		return err
 	}
-	machines = make(map[string]*Machine)
-	var ms []*Machine
+	machines = make(map[string]*machine)
+	var ms []*machine
 	err = json.Unmarshal(data, &ms)
 	if err != nil {
 		return err
@@ -429,7 +429,7 @@ func updateRoutine() {
 		if !running {
 			fetchTime = time.Now()
 			drawDate()
-			RunOnHosts(false)
+			runOnHosts(false)
 		}
 		time.Sleep(time.Duration(*sleepTime) * time.Second)
 	}
@@ -444,8 +444,8 @@ func main() {
 		fmt.Printf("%s", err.Error())
 		return
 	}
-	Init(machines)
-	sorter = Sorter{keyToIndex: make(map[string]int)}
+	initMachines(machines)
+	sorter = machineSorter{keyToIndex: make(map[string]int)}
 	for k := range machines {
 		sorter.keys = append(sorter.keys, k)
 		formatMachine(k)

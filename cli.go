@@ -37,7 +37,7 @@ const (
 )
 
 var (
-	tic           TextInColumns
+	tic           textInColumns
 	errorLayer    map[string]string
 	headerToIndex map[string]int
 
@@ -66,15 +66,15 @@ var (
 	compactHeader = []string{hMachine, hLoadCompact, hCPUCompact, hFreeCompact, hStorageCompact, hInodeCompact, hConnsCompact, hUptimeCompact, hServicesCompact}
 )
 
-func newStyledText() StyledText {
-	return StyledText{Runes: make([]rune, 0), FG: make([]termbox.Attribute, 0), BG: make([]termbox.Attribute, 0)}
+func newStyledText() styledText {
+	return styledText{Runes: make([]rune, 0), FG: make([]termbox.Attribute, 0), BG: make([]termbox.Attribute, 0)}
 }
 
-func Init(m map[string]*Machine) {
-	tic = TextInColumns{}
+func initMachines(m map[string]*machine) {
+	tic = textInColumns{}
 	errorLayer = make(map[string]string)
 	tic.Header = []string{hMachine, hLoad, hCPU, hFree, hStorage, hInode, hCons, hUptime, hServices}
-	tic.Data = make(map[string][]StyledText)
+	tic.Data = make(map[string][]styledText)
 	tic.ColumnWidth = make(map[string]int)
 	headerToIndex = make(map[string]int)
 	for i, h := range tic.Header {
@@ -85,19 +85,19 @@ func Init(m map[string]*Machine) {
 		putToColumnWidthMap(h, len(name))
 		headerToIndex[h] = i
 	}
-	tic.ColumnAlignment = map[string]Alignment{
-		hMachine:  AlignRight,
-		hLoad:     AlignCentre,
-		hCPU:      AlignRight,
-		hFree:     AlignRight,
-		hStorage:  AlignRight,
-		hInode:    AlignRight,
-		hCons:     AlignRight,
-		hUptime:   AlignRight,
-		hServices: AlignLeft,
+	tic.ColumnAlignment = map[string]alignment{
+		hMachine:  alignRight,
+		hLoad:     alignCentre,
+		hCPU:      alignRight,
+		hFree:     alignRight,
+		hStorage:  alignRight,
+		hInode:    alignRight,
+		hCons:     alignRight,
+		hUptime:   alignRight,
+		hServices: alignLeft,
 	}
 	for k := range m {
-		tic.Data[k] = make([]StyledText, len(tic.Header))
+		tic.Data[k] = make([]styledText, len(tic.Header))
 		if len(k) > getFromColumnWidthMap(hMachine) {
 			putToColumnWidthMap(hMachine, len(k))
 		}
@@ -117,7 +117,7 @@ func redraw() {
 		for _, k := range sorter.keys {
 			if matchingMachines[k] {
 				drawAtIndex(i, k, false)
-				i += 1
+				i++
 			}
 		}
 	} else {
@@ -167,19 +167,19 @@ func clearInfo(machine string) {
 	}
 }
 
-func appendSilent(s *StyledText) {
+func appendSilent(s *styledText) {
 	s.Runes = append(s.Runes, smallCircle)
 	s.FG = append(s.FG, 9)
 	s.BG = append(s.BG, termbox.ColorDefault)
 }
 
-func appendNoData(s *StyledText) {
+func appendNoData(s *styledText) {
 	s.Runes = append(s.Runes, ' ')
 	s.FG = append(s.FG, termbox.ColorDefault)
 	s.BG = append(s.BG, termbox.ColorDefault)
 }
 
-func rowToHeader(s *StyledText, machine string, header string) {
+func rowToHeader(s *styledText, machine string, header string) {
 	tic.Data[machine][headerToIndex[header]] = *s
 	if len(s.Runes) > getFromColumnWidthMap(header) {
 		putToColumnWidthMap(header, len(s.Runes))
@@ -187,7 +187,7 @@ func rowToHeader(s *StyledText, machine string, header string) {
 	}
 }
 
-func formatName(d *Machine) {
+func formatName(d *machine) {
 	s := newStyledText()
 	name := d.Name
 	if showIPs {
@@ -197,15 +197,15 @@ func formatName(d *Machine) {
 	if idx > -1 {
 		if !matchingMachines[d.Name] {
 			matchingMachines[d.Name] = true
-			matchingCount += 1
+			matchingCount++
 		}
 	}
 	for i, r := range name {
 		s.Runes = append(s.Runes, r)
 		if d.GotResult {
-			if d.Status&StatusError > 0 {
+			if d.Status&statusError > 0 {
 				s.FG = append(s.FG, 2)
-			} else if d.Status&StatusWarning > 0 {
+			} else if d.Status&statusWarning > 0 {
 				s.FG = append(s.FG, 4)
 			} else {
 				if silent {
@@ -226,12 +226,12 @@ func formatName(d *Machine) {
 	rowToHeader(&s, d.Name, hMachine)
 }
 
-func formatLoad(d *Machine) {
+func formatLoad(d *machine) {
 	s := newStyledText()
-	loads := []Measurement{d.Load1, d.Load5, d.Load15}
+	loads := []measurement{d.Load1, d.Load5, d.Load15}
 	for i, load := range loads {
 		status := getLoadStatus(d, load)
-		if silent && (status == StatusOK) {
+		if silent && (status == statusOK) {
 			appendSilent(&s)
 			width := getFromColumnWidthMap(hLoad)
 			for i := 0; i < int(width/4); i++ {
@@ -250,10 +250,10 @@ func formatLoad(d *Machine) {
 	rowToHeader(&s, d.Name, hLoad)
 }
 
-func formatCPU(d *Machine) {
+func formatCPU(d *machine) {
 	s := newStyledText()
 	status := getCPUStatus(d)
-	if silent && (status == StatusOK) {
+	if silent && (status == statusOK) {
 		appendSilent(&s)
 	} else {
 		formatText(fmt.Sprintf("%.1f", d.CPU.Value.(float32)), status, &s)
@@ -266,10 +266,10 @@ func formatCPU(d *Machine) {
 	rowToHeader(&s, d.Name, hCPU)
 }
 
-func formatFree(d *Machine) {
+func formatFree(d *machine) {
 	s := newStyledText()
 	status := getFreeStatus(d)
-	if silent && (status == StatusOK) {
+	if silent && (status == statusOK) {
 		appendSilent(&s)
 	} else {
 		formatText(fmt.Sprintf("%.2f", d.Free.Value.(float32)), status, &s)
@@ -277,7 +277,7 @@ func formatFree(d *Machine) {
 	rowToHeader(&s, d.Name, hFree)
 }
 
-func formatStorage(d *Machine) {
+func formatStorage(d *machine) {
 	s := newStyledText()
 	warn, ok := d.Storage.Warning.(float64)
 	if !ok {
@@ -289,7 +289,7 @@ func formatStorage(d *Machine) {
 	}
 	for _, datum := range d.Storage.Value.([]int32) {
 		status := getSingleStorageStatus(datum, warn, err)
-		if silent && (status == StatusOK) {
+		if silent && (status == statusOK) {
 			appendSilent(&s)
 		} else {
 			formatText(fmt.Sprintf("%3d", datum), status, &s)
@@ -299,7 +299,7 @@ func formatStorage(d *Machine) {
 	rowToHeader(&s, d.Name, hStorage)
 }
 
-func formatInode(d *Machine) {
+func formatInode(d *machine) {
 	s := newStyledText()
 	warn, ok := d.Inode.Warning.(float64)
 	if !ok {
@@ -311,7 +311,7 @@ func formatInode(d *Machine) {
 	}
 	for _, datum := range d.Inode.Value.([]int32) {
 		status := getSingleStorageStatus(datum, warn, err)
-		if silent && (status == StatusOK) {
+		if silent && (status == statusOK) {
 			appendSilent(&s)
 		} else {
 			formatText(fmt.Sprintf("%3d", datum), status, &s)
@@ -320,10 +320,10 @@ func formatInode(d *Machine) {
 	rowToHeader(&s, d.Name, hInode)
 }
 
-func formatCons(d *Machine) {
+func formatCons(d *machine) {
 	s := newStyledText()
 	status := getConnectionsStatus(d)
-	if silent && (status == StatusOK) {
+	if silent && (status == statusOK) {
 		appendSilent(&s)
 	} else {
 		formatText(fmt.Sprintf("%d", d.Connections.Value.(int32)), status, &s)
@@ -331,21 +331,21 @@ func formatCons(d *Machine) {
 	rowToHeader(&s, d.Name, hCons)
 }
 
-func formatUptime(d *Machine) {
+func formatUptime(d *machine) {
 	s := newStyledText()
 	status := getUptimeStatus(d)
-	if silent && (status == StatusOK) {
+	if silent && (status == statusOK) {
 		appendSilent(&s)
 	} else {
 		for _, r := range formatDuration(d.Uptime.Value.(int64)) {
 			s.Runes = append(s.Runes, r)
-			if status == StatusOK {
+			if status == statusOK {
 				if d.Uptime.Value.(int64) < 24*60*60 {
 					s.FG = append(s.FG, termbox.ColorDefault)
 				} else {
 					s.FG = append(s.FG, 9)
 				}
-			} else if status == StatusWarning {
+			} else if status == statusWarning {
 				s.FG = append(s.FG, 4|termbox.AttrBold)
 			} else {
 				s.FG = append(s.FG, 2|termbox.AttrBold)
@@ -356,10 +356,10 @@ func formatUptime(d *Machine) {
 	rowToHeader(&s, d.Name, hUptime)
 }
 
-func formatServices(d *Machine) {
+func formatServices(d *machine) {
 	s := newStyledText()
 	if d.Services.Value != nil {
-		statuses := [4]int{StatusOK, StatusUnknown, StatusWarning, StatusError}
+		statuses := [4]int{statusOK, statusUnknown, statusWarning, statusError}
 		for i, datum := range d.Services.Value.([4]int32) {
 			if silent && (i == 0 || datum == 0) {
 				appendSilent(&s)
@@ -383,12 +383,12 @@ func formatServices(d *Machine) {
 	rowToHeader(&s, d.Name, hServices)
 }
 
-func formatText(text string, status int, s *StyledText) {
+func formatText(text string, status int, s *styledText) {
 	for _, r := range text {
 		s.Runes = append(s.Runes, r)
-		if status == StatusOK {
+		if status == statusOK {
 			s.FG = append(s.FG, 3)
-		} else if status == StatusWarning {
+		} else if status == statusWarning {
 			s.FG = append(s.FG, 4|termbox.AttrBold)
 		} else {
 			s.FG = append(s.FG, 2|termbox.AttrBold)
@@ -405,9 +405,9 @@ func drawHeader() {
 		if silent {
 			name = compactHeader[i]
 		}
-		if tic.ColumnAlignment[h] == AlignCentre {
+		if tic.ColumnAlignment[h] == alignCentre {
 			position += ((getFromColumnWidthMap(h) - len(name)) / 2)
-		} else if tic.ColumnAlignment[h] == AlignRight {
+		} else if tic.ColumnAlignment[h] == alignRight {
 			position += (getFromColumnWidthMap(h) - len(name))
 		}
 		for j, r := range name {
@@ -495,9 +495,9 @@ func drawAtIndex(i int, name string, flush bool) {
 	for heidx, he := range tic.Header {
 		position := currentTab
 		s := tic.Data[name][heidx]
-		if tic.ColumnAlignment[he] == AlignCentre {
+		if tic.ColumnAlignment[he] == alignCentre {
 			position += ((getFromColumnWidthMap(he) - len(s.Runes)) / 2)
-		} else if tic.ColumnAlignment[he] == AlignRight {
+		} else if tic.ColumnAlignment[he] == alignRight {
 			position += (getFromColumnWidthMap(he) - len(s.Runes))
 		}
 		for j := 0; j < len(s.Runes); j++ {
@@ -549,7 +549,7 @@ func adjustStartPosition() {
 	}
 }
 
-func getSelectedMachine() *Machine {
+func getSelectedMachine() *machine {
 	key := sorter.keys[cursorPosition]
 	if search {
 		i := 0
@@ -558,7 +558,7 @@ func getSelectedMachine() *Machine {
 				if i == cursorPosition {
 					key = k
 				}
-				i += 1
+				i++
 			}
 		}
 	}
@@ -686,7 +686,7 @@ func handleCtrlA() {
 		go func(forceReConnect bool) {
 			fetchTime = time.Now()
 			drawDate()
-			RunOnHosts(forceReConnect)
+			runOnHosts(forceReConnect)
 		}(forceReConnect)
 	}
 }
@@ -697,7 +697,7 @@ func handleCtrlR() {
 		go func(forceReConnect bool) {
 			fetchTime = time.Now()
 			drawDate()
-			RunOnHost(m.Name, forceReConnect)
+			runOnHost(m.Name, forceReConnect)
 		}(forceReConnect)
 	}
 }
@@ -735,29 +735,29 @@ loop:
 		case termbox.EventKey:
 			switch ev.Key {
 			case termbox.KeyF1:
-				openConsole(F1)
+				openConsole(f1)
 			case termbox.KeyF2:
-				openConsole(F2)
+				openConsole(f2)
 			case termbox.KeyF3:
-				openConsole(F3)
+				openConsole(f3)
 			case termbox.KeyF4:
-				openConsole(F4)
+				openConsole(f4)
 			case termbox.KeyF5:
-				openConsole(F5)
+				openConsole(f5)
 			case termbox.KeyF6:
-				openConsole(F6)
+				openConsole(f6)
 			case termbox.KeyF7:
-				openConsole(F7)
+				openConsole(f7)
 			case termbox.KeyF8:
-				openConsole(F8)
+				openConsole(f8)
 			case termbox.KeyF9:
-				openConsole(F9)
+				openConsole(f9)
 			case termbox.KeyF10:
-				openConsole(F10)
+				openConsole(f10)
 			case termbox.KeyF11:
-				openConsole(F11)
+				openConsole(f11)
 			case termbox.KeyF12:
-				openConsole(F12)
+				openConsole(f12)
 			case termbox.KeyCtrlA:
 				handleCtrlA()
 			case termbox.KeyCtrlR:
