@@ -453,7 +453,7 @@ func drawStatusBar() {
 }
 
 func formatDuration(duration int64) string {
-	h := int64(math.Floor(float64(duration / 3600.0)))
+	h := int64(float64(duration / 3600.0))
 	m := int64(math.Floor(float64(float64(duration)-float64(3600*h)) / 60.0))
 	s := int64(math.Floor((float64(duration) - float64(3600*h) - float64(60*m))))
 	var hs, ms = "", ""

@@ -177,6 +177,5 @@ func init() {
 	}
 	if *cmdFile != "" {
 		getCommandsFromFile()
-	} else {
 	}
 }
