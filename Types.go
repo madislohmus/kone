@@ -112,18 +112,7 @@ func (s machineSorter) Less(i, j int) bool {
 	m2 := machines[s.keys[j]]
 
 	if m1.Status == m2.Status {
-		return sortByName(m1, m2)
-	}
-	return m1.Status > m2.Status
-}
-
-func sortByName(m1, m2 *machine) bool {
-	return strings.ToLower(m1.Name) < strings.ToLower(m2.Name)
-}
-
-func sortByStatus(m1, m2 *machine) bool {
-	if m1.Status == m2.Status {
-		return sortByName(m1, m2)
+		return strings.ToLower(m1.Name) < strings.ToLower(m2.Name)
 	}
 	return m1.Status > m2.Status
 }

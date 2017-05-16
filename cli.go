@@ -61,7 +61,6 @@ var (
 	indexFormat      string
 
 	smallCircle = '\u00b7'
-	hddFill     = []string{"\u25cb", "\u25d4", "\u25d1", "\u25d5", "\u25cf"}
 
 	compactHeader = []string{hMachine, hLoadCompact, hCPUCompact, hFreeCompact, hStorageCompact, hInodeCompact, hConnsCompact, hUptimeCompact, hServicesCompact}
 )
@@ -473,8 +472,7 @@ func drawAtIndex(i int, name string, flush bool) {
 	}
 	row := i - startPosition + dataStartRow
 	bg := termbox.ColorDefault
-	var indexFg termbox.Attribute
-	indexFg = 9
+	indexFg := termbox.Attribute(9)
 	if machines[name].Fetching {
 		indexFg = termbox.ColorGreen | termbox.AttrBold
 	}
