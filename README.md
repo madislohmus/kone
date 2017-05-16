@@ -55,5 +55,5 @@ Keys:
 ## Screenshot
 ![Screenshot](/../screenshot/output.gif?raw=true "Screenshot")
 
-##Acknowledgements
+## Acknowledgements
 Written using [termbox-go](https://github.com/nsf/termbox-go) library
