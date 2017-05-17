@@ -453,6 +453,7 @@ func initialFetch() {
 }
 
 func main() {
+	rand.Seed(time.Now().Unix())
 	signer = getSigner()
 	if signer == nil {
 		return
