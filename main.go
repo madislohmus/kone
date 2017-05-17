@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
+	"math/rand"
 	"net"
 	"sort"
 	"strconv"
@@ -424,14 +425,30 @@ func getSigner() *ssh.Signer {
 	return s
 }
 
+func fetchRandomMachine() {
+	fetchTime = time.Now()
+	drawDate()
+	machineNr := rand.Int31n(int32(len(machines)))
+	key := sorter.keys[machineNr]
+	if !machines[key].Fetching {
+		wg.Add(1)
+		go runCommandOnHost(command, key, false)
+		wg.Wait()
+	}
+}
+
 func updateRoutine() {
 	for {
-		if !running {
-			fetchTime = time.Now()
-			drawDate()
-			runOnHosts(false)
-		}
-		time.Sleep(time.Duration(*sleepTime) * time.Second)
+		go fetchRandomMachine()
+		time.Sleep(time.Duration(60000/len(machines)) * time.Millisecond)
+	}
+}
+
+func initialFetch() {
+	if !running {
+		fetchTime = time.Now()
+		drawDate()
+		runOnHosts(false)
 	}
 }
 
@@ -454,6 +471,7 @@ func main() {
 	redrawRequestChannel = make(chan bool, 10)
 	go redrawRoutine()
 	go sortingRoutine()
+	go initialFetch()
 	go updateRoutine()
 	runCli()
 }
