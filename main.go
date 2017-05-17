@@ -23,16 +23,17 @@ type (
 )
 
 const (
-	loadCmd        = `cat /proc/loadavg | awk '{print $1,$2,$3}'`
-	freeCmd        = `if [ "$(free | grep available)" ]; then free | grep Mem | awk '{print ($2-$7)/$2}'; else free | grep Mem | awk '{print ($3-$6-$7)/$2}'; fi`
-	connsCmd       = `netstat -ant | awk '{print $5}' | uniq -u | wc -l`
-	procCmd        = `nproc`
-	storageCmd     = `df -x tmpfs -x none | grep '/' | grep '%' | awk '{print $6 "=" $5}' | sort -g | awk '{printf "%s ",$0} END {print " "}'`
-	inodeCmd       = `df -i -x tmpfs -x none | grep '/' | grep '%' | awk '{print $6 "=" $5}' | sort -g | awk '{printf "%s ",$0} END {print " "}'`
-	uptimeCmd      = `cat /proc/uptime | awk '{print $1}'`
-	cpuUtilCmd     = `top -b -n2 | grep "Cpu(s)"| tail -n 1 | awk '{print $2 + $4}'`
-	consulServices = `curl -s http://localhost:8500/v1/health/node/$(hostname)`
-	command        = loadCmd + ` &&  ` + freeCmd + `&& ` + connsCmd + ` && ` + procCmd + ` && ` + storageCmd + ` && ` + inodeCmd + ` && ` + uptimeCmd + ` && ` + cpuUtilCmd + `&&` + consulServices
+	updateTimeMillis = 60000 * 5
+	loadCmd          = `cat /proc/loadavg | awk '{print $1,$2,$3}'`
+	freeCmd          = `if [ "$(free | grep available)" ]; then free | grep Mem | awk '{print ($2-$7)/$2}'; else free | grep Mem | awk '{print ($3-$6-$7)/$2}'; fi`
+	connsCmd         = `netstat -ant | awk '{print $5}' | uniq -u | wc -l`
+	procCmd          = `nproc`
+	storageCmd       = `df -x tmpfs -x none | grep '/' | grep '%' | awk '{print $6 "=" $5}' | sort -g | awk '{printf "%s ",$0} END {print " "}'`
+	inodeCmd         = `df -i -x tmpfs -x none | grep '/' | grep '%' | awk '{print $6 "=" $5}' | sort -g | awk '{printf "%s ",$0} END {print " "}'`
+	uptimeCmd        = `cat /proc/uptime | awk '{print $1}'`
+	cpuUtilCmd       = `top -b -n2 | grep "Cpu(s)"| tail -n 1 | awk '{print $2 + $4}'`
+	consulServices   = `curl -s http://localhost:8500/v1/health/node/$(hostname)`
+	command          = loadCmd + ` &&  ` + freeCmd + `&& ` + connsCmd + ` && ` + procCmd + ` && ` + storageCmd + ` && ` + inodeCmd + ` && ` + uptimeCmd + ` && ` + cpuUtilCmd + `&&` + consulServices
 )
 
 var (
@@ -440,7 +441,7 @@ func fetchRandomMachine() {
 func updateRoutine() {
 	for {
 		go fetchRandomMachine()
-		time.Sleep(time.Duration(60000/len(machines)) * time.Millisecond)
+		time.Sleep(time.Duration(updateTimeMillis/len(machines)) * time.Millisecond)
 	}
 }
 
