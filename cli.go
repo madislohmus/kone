@@ -202,7 +202,9 @@ func formatName(d *machine) {
 	for i, r := range name {
 		s.Runes = append(s.Runes, r)
 		if d.GotResult {
-			if d.Status&statusError > 0 {
+			if search && len(searchString) > 0 && idx > -1 && i >= idx && i < idx+len(searchString) {
+				s.FG = append(s.FG, termbox.ColorBlack)
+			} else if d.Status&statusError > 0 {
 				s.FG = append(s.FG, 2)
 			} else if d.Status&statusWarning > 0 {
 				s.FG = append(s.FG, 4)
@@ -502,8 +504,9 @@ func drawAtIndex(i int, name string, flush bool) {
 			fg := s.FG[j]
 			bg := s.BG[j]
 			if selected {
-				fg = selectedFg
+				fg = termbox.ColorBlack | termbox.AttrBold
 				if bg == termbox.ColorDefault {
+					fg = selectedFg
 					bg = selectedBg
 				}
 			}
