@@ -6,6 +6,7 @@ import (
 	"io/ioutil"
 	"math/rand"
 	"net"
+	"os"
 	"sort"
 	"strconv"
 	"strings"
@@ -14,6 +15,7 @@ import (
 
 	"github.com/madislohmus/gosh"
 	"golang.org/x/crypto/ssh"
+	"golang.org/x/crypto/ssh/agent"
 )
 
 type (
@@ -408,6 +410,15 @@ func populateMachines() error {
 	return nil
 }
 
+func getSignersFromAgent() ([]ssh.Signer, error) {
+	sock, err := net.Dial("unix", os.Getenv("SSH_AUTH_SOCK"))
+	if err != nil {
+		return nil, err
+	}
+
+	return agent.NewClient(sock).Signers()
+}
+
 func getSigner() *ssh.Signer {
 	var p []byte
 	if *passFile != "" {
@@ -418,6 +429,7 @@ func getSigner() *ssh.Signer {
 		}
 		p = pass
 	}
+
 	s, err := gosh.GetSigner(*keyFile, string(p))
 	if err != nil {
 		fmt.Println("Could not get signer!")
@@ -455,10 +467,17 @@ func initialFetch() {
 
 func main() {
 	rand.Seed(time.Now().Unix())
-	signer = getSigner()
-	if signer == nil {
-		return
+	signers, err := getSignersFromAgent()
+	if len(signers) == 0 || err != nil {
+		signer = getSigner()
+		if signer == nil {
+			return
+		}
+	} else {
+		// use the first one, TODO: how to select correct one
+		signer = &signers[0]
 	}
+
 	if err := populateMachines(); err != nil {
 		fmt.Printf("%s", err.Error())
 		return
