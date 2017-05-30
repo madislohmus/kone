@@ -76,12 +76,13 @@ const (
 )
 
 var (
-	dataFile  = flag.String("data", "", "input file")
-	keyFile   = flag.String("key", "", "ssh key file")
-	passFile  = flag.String("pass", "", "key password file (optional)")
-	terminal  = flag.String("term", os.Getenv("TERM"), "terminal")
-	cmdFile   = flag.String("cmd", "", "command file")
-	sleepTime = flag.Int("t", 300, "sleep time between refresh in seconds")
+	dataFile   = flag.String("data", "", "input file")
+	knownHosts = flag.String("h", "~/.ssh/known_hosts", "input file")
+	keyFile    = flag.String("key", "", "ssh key file")
+	passFile   = flag.String("pass", "", "key password file (optional)")
+	terminal   = flag.String("term", os.Getenv("TERM"), "terminal")
+	cmdFile    = flag.String("cmd", "", "command file")
+	sleepTime  = flag.Int("t", 300, "sleep time between refresh in seconds")
 
 	f1  string
 	f2  string

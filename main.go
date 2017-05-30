@@ -1,12 +1,18 @@
 package main
 
 import (
+	"crypto/hmac"
+	"crypto/sha1"
+	"encoding/base64"
 	"encoding/json"
+	"errors"
 	"fmt"
+	"io"
 	"io/ioutil"
 	"math/rand"
 	"net"
 	"os"
+	"regexp"
 	"sort"
 	"strconv"
 	"strings"
@@ -25,6 +31,7 @@ type (
 )
 
 const (
+	unixNetwork      = "unix"
 	updateTimeMillis = 60000 * 5
 	loadCmd          = `cat /proc/loadavg | awk '{print $1,$2,$3}'`
 	freeCmd          = `if [ "$(free | grep available)" ]; then free | grep Mem | awk '{print ($2-$7)/$2}'; else free | grep Mem | awk '{print ($3-$6-$7)/$2}'; fi`
@@ -41,12 +48,13 @@ const (
 var (
 	wg                   sync.WaitGroup
 	machines             map[string]*machine
-	signer               *ssh.Signer
+	signers              []ssh.Signer
 	sorter               machineSorter
 	running              bool
 	fetchTime            time.Time
 	sortRequestChannel   chan bool
 	redrawRequestChannel chan bool
+	sshAuthSocket        = os.Getenv("SSH_AUTH_SOCK")
 )
 
 func runOnHost(machine string, forceReConnect bool) {
@@ -403,15 +411,93 @@ func populateMachines() error {
 			Host:    m.Host,
 			Port:    m.Port,
 			Timeout: 15 * time.Second,
-			Signer:  signer}
+			Signers: signers}
 		m.config = &config
 		machines[m.Name] = m
+	}
+	err = populatePublicKeys(machines)
+	if err != nil {
+		return err
 	}
 	return nil
 }
 
+func populatePublicKeys(machines map[string]*machine) error {
+	data, err := ioutil.ReadFile(*knownHosts)
+	if err != nil {
+		return err
+	}
+	hostToKey := make(map[string]ssh.PublicKey)
+	_, hosts, publicKey, _, rest, err := ssh.ParseKnownHosts(data)
+	for err == nil {
+		for _, host := range hosts {
+			hostToKey[host] = publicKey
+		machineLoop:
+			for _, machine := range machines {
+				if net.ParseIP(host) != nil {
+					if host == machine.Host {
+						machine.config.PublicKey = publicKey
+						machines[machine.Name] = machine
+						break machineLoop
+					}
+				} else {
+					ipPat := regexp.MustCompile("\\[(.+?)\\]")
+					ips := ipPat.FindStringSubmatch(host)
+					if len(ips) > 1 {
+						if ips[1] == machine.Host {
+							machine.config.PublicKey = publicKey
+							machines[ips[1]] = machine
+							break machineLoop
+						}
+					} else {
+						// host is hashed, lets hash machine and check if match found
+						hashedHost, err := getHashForHost(host, machine.Host)
+						if err != nil {
+							return err
+						}
+						if hashedHost == host {
+							machine.config.PublicKey = publicKey
+							machines[machine.Name] = machine
+							break machineLoop
+						}
+					}
+				}
+			}
+		}
+		_, hosts, publicKey, _, rest, err = ssh.ParseKnownHosts(rest)
+	}
+	if err != io.EOF {
+		return err
+	}
+	return nil
+}
+
+func getHashForHost(host, ip string) (string, error) {
+	chunks := strings.Split(host, "|")
+	if len(chunks) != 4 {
+		return "", errors.New(fmt.Sprintf("Expected 3 cunks, got %d: %s", len(chunks), host))
+	}
+	if chunks[1] == "1" {
+		saltStr := chunks[2]
+		salt, err := base64.StdEncoding.DecodeString(saltStr)
+		if err != nil {
+			return "", err
+		}
+		mac := hmac.New(sha1.New, salt)
+		mac.Write([]byte(ip))
+		hash := mac.Sum(nil)
+		return strings.Join([]string{"",
+			"1",
+			base64.StdEncoding.EncodeToString(salt),
+			base64.StdEncoding.EncodeToString(hash),
+		}, "|"), nil
+	} else {
+		return "", errors.New("Expected hash type to be '1'")
+	}
+}
+
 func getSignersFromAgent() ([]ssh.Signer, error) {
-	sock, err := net.Dial("unix", os.Getenv("SSH_AUTH_SOCK"))
+	sock, err := net.Dial(unixNetwork, sshAuthSocket)
 	if err != nil {
 		return nil, err
 	}
@@ -467,15 +553,14 @@ func initialFetch() {
 
 func main() {
 	rand.Seed(time.Now().Unix())
-	signers, err := getSignersFromAgent()
+	var err error
+	signers, err = getSignersFromAgent()
 	if len(signers) == 0 || err != nil {
-		signer = getSigner()
+		signer := getSigner()
 		if signer == nil {
 			return
 		}
-	} else {
-		// use the first one, TODO: how to select correct one
-		signer = &signers[0]
+		signers = append(signers, *signer)
 	}
 
 	if err := populateMachines(); err != nil {
