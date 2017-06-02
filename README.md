@@ -3,8 +3,10 @@ Simple CLI for getting simple status info from multiple machines.
 
 ## Usage
 ```
-./kone -data <data file path> -key <key file path> [-pass <key password file path>] [-cmd <custom commands file path>]
+./kone -data <data file path> -key <key file path> -h <known_hosts path> [-pass <key password file path>] [-cmd <custom commands file path>]
 ```
+
+As go lately added required host key callback (https://github.com/golang/go/issues/19767), kone now uses `FixedHostKey` as the callback function. For that `known_hosts` file path must be provided that will be parsed for hosts' public keys.
 
 Data file must contain a JSON array of remote machines in following format:
 ```
