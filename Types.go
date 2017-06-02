@@ -77,7 +77,7 @@ const (
 
 var (
 	dataFile   = flag.String("data", "", "input file")
-	knownHosts = flag.String("h", "~/.ssh/known_hosts", "input file")
+	knownHosts = flag.String("h", "", "path to known hosts file (e.g. ~/.ssh/known_hosts)")
 	keyFile    = flag.String("key", "", "ssh key file")
 	passFile   = flag.String("pass", "", "key password file (optional)")
 	terminal   = flag.String("term", os.Getenv("TERM"), "terminal")
