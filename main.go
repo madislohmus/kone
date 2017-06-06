@@ -415,9 +415,11 @@ func populateMachines() error {
 		m.config = &config
 		machines[m.Name] = m
 	}
-	err = populatePublicKeys(machines)
-	if err != nil {
-		return err
+	if len(*knownHosts) > 0 {
+		err = populatePublicKeys(machines)
+		if err != nil {
+			return err
+		}
 	}
 	return nil
 }
