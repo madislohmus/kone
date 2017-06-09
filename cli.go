@@ -25,15 +25,6 @@ const (
 	hCons     = "conns"
 	hUptime   = "uptime"
 	hServices = "services"
-
-	hLoadCompact     = "l"
-	hCPUCompact      = "C"
-	hFreeCompact     = "f"
-	hStorageCompact  = "S"
-	hInodeCompact    = "i"
-	hConnsCompact    = "c"
-	hUptimeCompact   = "u"
-	hServicesCompact = "s"
 )
 
 var (
@@ -61,8 +52,6 @@ var (
 	indexFormat      string
 
 	smallCircle = '\u00b7'
-
-	compactHeader = []string{hMachine, hLoadCompact, hCPUCompact, hFreeCompact, hStorageCompact, hInodeCompact, hConnsCompact, hUptimeCompact, hServicesCompact}
 )
 
 func newStyledText() styledText {
@@ -78,9 +67,6 @@ func initMachines(m map[string]*machine) {
 	headerToIndex = make(map[string]int)
 	for i, h := range tic.Header {
 		name := h
-		if silent {
-			name = compactHeader[i]
-		}
 		putToColumnWidthMap(h, len(name))
 		headerToIndex[h] = i
 	}
@@ -232,21 +218,11 @@ func formatLoad(d *machine) {
 	loads := []measurement{d.Load1, d.Load5, d.Load15}
 	for i, load := range loads {
 		status := getLoadStatus(d, load)
-		if silent && (status == statusOK) {
-			appendSilent(&s)
-			width := getFromColumnWidthMap(hLoad)
-			for i := 0; i < int(width/4); i++ {
-				s.Runes = append(s.Runes, ' ')
-				s.FG = append(s.FG, 9)
-				s.BG = append(s.BG, termbox.ColorDefault)
-			}
-		} else {
-			formatStr := "%.2f"
-			if i+1 < len(loads) {
-				formatStr += " "
-			}
-			formatText(fmt.Sprintf(formatStr, load.Value.(float32)), status, &s)
+		formatStr := "%.2f"
+		if i+1 < len(loads) {
+			formatStr += " "
 		}
+		formatText(fmt.Sprintf(formatStr, load.Value.(float32)), status, &s)
 	}
 	rowToHeader(&s, d.Name, hLoad)
 }
@@ -254,15 +230,15 @@ func formatLoad(d *machine) {
 func formatCPU(d *machine) {
 	s := newStyledText()
 	status := getCPUStatus(d)
-	if silent && (status == statusOK) {
-		appendSilent(&s)
-	} else {
-		formatText(fmt.Sprintf("%.1f", d.CPU.Value.(float32)), status, &s)
-		for _, r := range fmt.Sprintf(":%d", d.Nproc) {
+	formatText(fmt.Sprintf("%.1f", d.CPU.Value.(float32)), status, &s)
+	for _, r := range fmt.Sprintf(":%d", d.Nproc) {
+		if silent {
+			s.Runes = append(s.Runes, ' ')
+		} else {
 			s.Runes = append(s.Runes, r)
-			s.FG = append(s.FG, 9)
-			s.BG = append(s.BG, termbox.ColorDefault)
 		}
+		s.FG = append(s.FG, 9)
+		s.BG = append(s.BG, termbox.ColorDefault)
 	}
 	rowToHeader(&s, d.Name, hCPU)
 }
@@ -270,11 +246,7 @@ func formatCPU(d *machine) {
 func formatFree(d *machine) {
 	s := newStyledText()
 	status := getFreeStatus(d)
-	if silent && (status == statusOK) {
-		appendSilent(&s)
-	} else {
-		formatText(fmt.Sprintf("%.2f", d.Free.Value.(float32)), status, &s)
-	}
+	formatText(fmt.Sprintf("%.2f", d.Free.Value.(float32)), status, &s)
 	rowToHeader(&s, d.Name, hFree)
 }
 
@@ -290,11 +262,7 @@ func formatStorage(d *machine) {
 	}
 	for _, datum := range d.Storage.Value.([]int32) {
 		status := getSingleStorageStatus(datum, warn, err)
-		if silent && (status == statusOK) {
-			appendSilent(&s)
-		} else {
-			formatText(fmt.Sprintf("%3d", datum), status, &s)
-		}
+		formatText(fmt.Sprintf("%3d", datum), status, &s)
 	}
 
 	rowToHeader(&s, d.Name, hStorage)
@@ -312,11 +280,7 @@ func formatInode(d *machine) {
 	}
 	for _, datum := range d.Inode.Value.([]int32) {
 		status := getSingleStorageStatus(datum, warn, err)
-		if silent && (status == statusOK) {
-			appendSilent(&s)
-		} else {
-			formatText(fmt.Sprintf("%3d", datum), status, &s)
-		}
+		formatText(fmt.Sprintf("%3d", datum), status, &s)
 	}
 	rowToHeader(&s, d.Name, hInode)
 }
@@ -324,35 +288,36 @@ func formatInode(d *machine) {
 func formatCons(d *machine) {
 	s := newStyledText()
 	status := getConnectionsStatus(d)
-	if silent && (status == statusOK) {
-		appendSilent(&s)
-	} else {
-		formatText(fmt.Sprintf("%d", d.Connections.Value.(int32)), status, &s)
-	}
+	formatText(fmt.Sprintf("%d", d.Connections.Value.(int32)), status, &s)
 	rowToHeader(&s, d.Name, hCons)
 }
 
 func formatUptime(d *machine) {
 	s := newStyledText()
 	status := getUptimeStatus(d)
-	if silent && (status == statusOK) {
-		appendSilent(&s)
-	} else {
-		for _, r := range formatDuration(d.Uptime.Value.(int64)) {
-			s.Runes = append(s.Runes, r)
-			if status == statusOK {
-				if d.Uptime.Value.(int64) < 24*60*60 {
-					s.FG = append(s.FG, termbox.ColorDefault)
-				} else {
-					s.FG = append(s.FG, 9)
-				}
-			} else if status == statusWarning {
-				s.FG = append(s.FG, 4|termbox.AttrBold)
+	utime := formatDuration(d.Uptime.Value.(int64))
+	for i, r := range utime {
+		if silent && status == statusOK {
+			if i == len(utime)-1 {
+				s.Runes = append(s.Runes, smallCircle)
 			} else {
-				s.FG = append(s.FG, 2|termbox.AttrBold)
+				s.Runes = append(s.Runes, ' ')
 			}
-			s.BG = append(s.BG, termbox.ColorDefault)
+		} else {
+			s.Runes = append(s.Runes, r)
 		}
+		if status == statusOK {
+			if d.Uptime.Value.(int64) < 24*60*60 && !silent {
+				s.FG = append(s.FG, termbox.ColorDefault)
+			} else {
+				s.FG = append(s.FG, 9)
+			}
+		} else if status == statusWarning {
+			s.FG = append(s.FG, 4|termbox.AttrBold)
+		} else {
+			s.FG = append(s.FG, 2|termbox.AttrBold)
+		}
+		s.BG = append(s.BG, termbox.ColorDefault)
 	}
 	rowToHeader(&s, d.Name, hUptime)
 }
@@ -362,18 +327,22 @@ func formatServices(d *machine) {
 	if d.Services.Value != nil {
 		statuses := [4]int{statusOK, statusUnknown, statusWarning, statusError}
 		for i, datum := range d.Services.Value.([4]int32) {
-			if silent && (i == 0 || datum == 0) {
-				appendSilent(&s)
-			} else {
-				if datum == 0 {
-					for _, r := range " 0" {
+			if datum == 0 {
+				for i, r := range " 0" {
+					if silent {
+						if i == len(" 0")-1 {
+							s.Runes = append(s.Runes, smallCircle)
+						} else {
+							s.Runes = append(s.Runes, ' ')
+						}
+					} else {
 						s.Runes = append(s.Runes, r)
-						s.FG = append(s.FG, 9)
-						s.BG = append(s.BG, termbox.ColorDefault)
 					}
-				} else {
-					formatText(fmt.Sprintf("%2d", datum), statuses[i], &s)
+					s.FG = append(s.FG, 9)
+					s.BG = append(s.BG, termbox.ColorDefault)
 				}
+			} else {
+				formatText(fmt.Sprintf("%2d", datum), statuses[i], &s)
 			}
 		}
 	} else {
@@ -385,10 +354,22 @@ func formatServices(d *machine) {
 }
 
 func formatText(text string, status int, s *styledText) {
-	for _, r := range text {
-		s.Runes = append(s.Runes, r)
+	for i, r := range text {
+		if silent && status == statusOK {
+			if i == len(text)-1 {
+				s.Runes = append(s.Runes, smallCircle)
+			} else {
+				s.Runes = append(s.Runes, ' ')
+			}
+		} else {
+			s.Runes = append(s.Runes, r)
+		}
 		if status == statusOK {
-			s.FG = append(s.FG, 3)
+			if silent {
+				s.FG = append(s.FG, 9)
+			} else {
+				s.FG = append(s.FG, 3)
+			}
 		} else if status == statusWarning {
 			s.FG = append(s.FG, 4|termbox.AttrBold)
 		} else {
@@ -400,12 +381,9 @@ func formatText(text string, status int, s *styledText) {
 
 func drawHeader() {
 	currentTab := 1
-	for i, h := range tic.Header {
+	for _, h := range tic.Header {
 		position := currentTab
 		name := h
-		if silent {
-			name = compactHeader[i]
-		}
 		if tic.ColumnAlignment[h] == alignCentre {
 			position += ((getFromColumnWidthMap(h) - len(name)) / 2)
 		} else if tic.ColumnAlignment[h] == alignRight {
@@ -803,21 +781,15 @@ loop:
 					forceReConnect = !forceReConnect
 				case 115: // s - silent
 					silent = !silent
-					for i, h := range tic.Header {
+					for _, h := range tic.Header {
 						l := len(h)
-						if silent {
-							l = len(compactHeader[i])
-						}
 						putToColumnWidthMap(h, l)
 					}
 					formatAll()
 				case 105: // i - show IP-s
 					showIPs = !showIPs
-					for i, h := range tic.Header {
+					for _, h := range tic.Header {
 						l := len(h)
-						if silent {
-							l = len(compactHeader[i])
-						}
 						putToColumnWidthMap(h, l)
 					}
 					formatAll()
