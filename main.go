@@ -31,6 +31,7 @@ type (
 )
 
 const (
+	hashType         = "1"
 	unixNetwork      = "unix"
 	updateTimeMillis = 60000 * 5
 	loadCmd          = `cat /proc/loadavg | awk '{print $1,$2,$3}'`
@@ -475,26 +476,26 @@ func populatePublicKeys(machines map[string]*machine) error {
 }
 
 func getHashForHost(host, ip string) (string, error) {
-	chunks := strings.Split(host, "|")
+	splitter := "|"
+	chunks := strings.Split(host, splitter)
 	if len(chunks) != 4 {
-		return "", errors.New(fmt.Sprintf("Expected 3 cunks, got %d: %s", len(chunks), host))
+		message := fmt.Sprintf("Expected 3 cunks, got %d: %s", len(chunks), host)
+		return "", errors.New(message)
 	}
-	if chunks[1] == "1" {
-		saltStr := chunks[2]
-		salt, err := base64.StdEncoding.DecodeString(saltStr)
+	if chunks[1] == hashType {
+		encodedSalt := chunks[2]
+		salt, err := base64.StdEncoding.DecodeString(encodedSalt)
 		if err != nil {
 			return "", err
 		}
 		mac := hmac.New(sha1.New, salt)
 		mac.Write([]byte(ip))
 		hash := mac.Sum(nil)
-		return strings.Join([]string{"",
-			"1",
-			base64.StdEncoding.EncodeToString(salt),
-			base64.StdEncoding.EncodeToString(hash),
-		}, "|"), nil
+		encodedHash := base64.StdEncoding.EncodeToString(hash)
+		parts := []string{"", hashType, encodedSalt, encodedHash}
+		return strings.Join(parts, splitter), nil
 	} else {
-		return "", errors.New("Expected hash type to be '1'")
+		return "", fmt.Errorf("Expected hash type to be '%s'", hashType)
 	}
 }
 
